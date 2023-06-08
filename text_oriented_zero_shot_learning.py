@@ -1,15 +1,12 @@
 import os, sys, random
 import numpy as np
 import torch
-import torch.nn as nn
-from time import time
 from tqdm import tqdm, trange
 from termcolor import cprint
 # import wandb
 import pandas as pd
 from omegaconf import DictConfig, open_dict
-import hydra
-from hydra.utils import get_original_cwd
+import json
 
 from constants import device
 # from speech_decoding.dataclass.brennan2018 import Brennan2018Dataset
@@ -19,21 +16,21 @@ from constants import device
 #     Gwilliams2022DeepSplit,
 #     Gwilliams2022Collator,
 # )
-from torch.utils.data import DataLoader, RandomSampler, BatchSampler
+from torch.utils.data import DataLoader
 
 from meg_decoding.models import get_model, Classifier
 from meg_decoding.utils.get_dataloaders import get_dataloaders, get_samplers
 from meg_decoding.utils.loss import *
 from meg_decoding.dataclass.god import GODDatasetBase, GODCollator
 from meg_decoding.utils.loggers import Pickleogger
-from meg_decoding.utils.vis_grad import get_grad
+from meg_decoding.clip_utils.get_embedding import get_language_model
 from torch.utils.data.dataset import Subset
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pickle
 from PIL import Image
 
-def run(args: DictConfig) -> None:
+def run(args: DictConfig, prompts:list, text_embeddings:list) -> None:
 
     from meg_decoding.utils.reproducibility import seed_worker
     # NOTE: We do need it (IMHO).
@@ -52,93 +49,13 @@ def run(args: DictConfig) -> None:
 
     pkl_logger = Pickleogger(os.path.join(args.save_root, 'runs'))
 
-    # with open_dict(args):
-    #     args.root_dir = get_original_cwd()
     cprint(f"Current working directory : {os.getcwd()}")
     cprint(args, color="white")
 
     # -----------------------
     #       Dataloader
     # -----------------------
-    # NOTE: Segmentation should always be by word onsets, not just every 3 seconds
-    if args.dataset == "Gwilliams2022":
-
-        if args.split_mode == "sentence":
-
-            train_set = Gwilliams2022SentenceSplit(args)
-            test_set = Gwilliams2022SentenceSplit(args, train_set.test_word_idxs_dict)
-
-            assert train_set.num_subjects == test_set.num_subjects
-            with open_dict(args):
-                args.num_subjects = train_set.num_subjects
-
-            test_size = test_set.Y.shape[0]
-
-        elif args.split_mode == "shallow":
-
-            dataset = Gwilliams2022ShallowSplit(args)
-
-            with open_dict(args):
-                args.num_subjects = dataset.num_subjects
-
-            train_size = int(dataset.Y.shape[0] * args.split_ratio)
-            test_size = dataset.Y.shape[0] - train_size
-            train_set, test_set = torch.utils.data.random_split(
-                dataset, lengths=[train_size, test_size], generator=g,
-            )
-
-        elif args.split_mode == "deep":
-
-            train_set = Gwilliams2022DeepSplit(args, train=True)
-            test_set = Gwilliams2022DeepSplit(args, train=False)
-            assert train_set.num_subjects == test_set.num_subjects
-
-            with open_dict(args):
-                args.num_subjects = train_set.num_subjects
-
-            test_size = test_set.Y.shape[0]
-
-        cprint(f"Test segments: {test_size}", "cyan")
-
-        if args.use_sampler:
-            # NOTE: currently not supporting reproducibility
-            train_loader, test_loader = get_samplers(
-                train_set,
-                test_set,
-                args,
-                test_bsz=test_size,
-                collate_fn=Gwilliams2022Collator(args),
-            )
-        else:
-            # FIXME: maybe either get rid of reproducibility, or remove this?
-            if args.reproducible:
-                train_loader, test_loader = get_dataloaders(
-                    train_set, test_set, args, seed_worker, g, test_bsz=test_size
-                )
-            else:
-                train_loader, test_loader = get_dataloaders(
-                    train_set, test_set, args, test_bsz=test_size
-                )
-
-    elif args.dataset == "Brennan2018":
-        # NOTE: takes an optional debug param force_recompute to pre-process the EEG even if it exists
-        dataset = Brennan2018Dataset(args)
-        with open_dict(args):
-            args.num_subjects = dataset.num_subjects
-
-        train_size = int(len(dataset) * args.split_ratio)
-        test_size = len(dataset) - train_size
-        train_set, test_set = torch.utils.data.random_split(
-            dataset, lengths=[train_size, test_size], generator=g,
-        )
-        cprint(
-            f"Number of samples: {len(train_set)} (train), {len(test_set)} (test)", color="blue",
-        )
-        train_loader, test_loader = get_dataloaders(
-            train_set, test_set, args, g, seed_worker, test_bsz=test_size
-        )
-
-    elif args.dataset == "GOD":
+    if args.dataset == "GOD":
         source_dataset = GODDatasetBase(args, 'train', return_label=True)
         outlier_dataset = GODDatasetBase(args, 'val', return_label=True,
                                          mean_X= source_dataset.mean_X,
@@ -245,30 +162,8 @@ def run(args: DictConfig) -> None:
     # ======================================
     # train_losses = []
     test_losses = []
-    # trainTop1accs = []
-    # trainTop10accs = []
     testTop1accs = []
     testTop10accs = []
-    # brain_encoder.eval()
-    # pbar2 = tqdm(train_loader)
-    # for i, batch in enumerate(pbar2):
-    #     with torch.no_grad():
-    #         if len(batch) == 3:
-    #             X, Y, subject_idxs = batch
-    #         elif len(batch) == 4:
-    #             X, Y, subject_idxs, chunkIDs = batch
-    #         else:
-    #             raise ValueError("Unexpected number of items from dataloader.")
-
-    #         X, Y = X.to(device), Y.to(device)
-    #         # import pdb; pdb.set_trace()
-    #         Z = brain_encoder(X, subject_idxs)
-    #         loss = loss_func(Y, Z)
-    #         with torch.no_grad():
-    #             trainTop1acc, trainTop10acc = classifier(Z, Y)
-    #         train_losses.append(loss.item())
-    #         trainTop1accs.append(trainTop1acc)
-    #         trainTop10accs.append(trainTop10acc)
 
     Zs = []
     Ys = []
@@ -317,68 +212,21 @@ def run(args: DictConfig) -> None:
     Zs = Zs - Zs.mean(dim=1, keepdims=True)
     Zs = Zs / Zs.std(dim=1, keepdims=True)
 
-    acc, mat = evaluate(Zs, Ys)
-    vis_confusion_mat(mat, acc, os.path.join(args.save_root, 'confusion_mat.png'))
-    n_database_hits = mat.sum(axis=0)
-    print('Num of hits of dataset \n', n_database_hits)
+    # prompt orienting
+    T = text_embeddings[0].to(device)
+    T = T - source_dataset.mean_Y
+    T = T / source_dataset.std_Y
 
-    miss_detection = np.sum(mat < 0, axis=0)/(len(mat)-1)  # FP
-    print('Num miss detection: \n', miss_detection)
-
-    true_detection = np.sum(mat > 0, axis=1) / (len(mat)-1) # TP
-    print('Num query detection: \n', true_detection)
-
-
-    N=1
-    plot_array_label =  np.argsort(miss_detection)[::-1][:N]
-    plot_array_value = np.sort(miss_detection)[::-1][:N]
-    print('miss detection id', plot_array_label)
-    print('miss detection value', plot_array_value)
-    fig, axes = plt.subplots(nrows=2, figsize=(32,8))
-    boxplot_and_plot(Zs.detach().cpu().numpy(), plot_array_label, axes[0])
-    boxplot_and_plot(Ys.detach().cpu().numpy(), plot_array_label, axes[1])
-    plt.savefig(os.path.join(args.save_root, 'boxplot_and_plot.png'),bbox_inches='tight')
-    plt.close()
-
-    N=1
-    plot_array_label =  np.argsort(true_detection)[:N]
-    plot_array_value = np.sort(true_detection)[:N]
-    print(plot_array_label)
-    print(plot_array_value)
-    fig, axes = plt.subplots(nrows=2, figsize=(32,8))
-    boxplot_and_plot(Zs.detach().cpu().numpy(), plot_array_label, axes[0])
-    boxplot_and_plot(Ys.detach().cpu().numpy(), plot_array_label, axes[1])
-    plt.savefig(os.path.join(args.save_root, 'boxplot_and_plot_weak.png'),bbox_inches='tight')
-    plt.close()
-
-    mask = np.tril(np.ones_like(mat), k=-1) > 0
-    bias_detection = np.abs(mat - mat.T)
-    biased_judge = np.sum((bias_detection==2) * mask)
-    fair_judge = np.sum((bias_detection==0) * mask)
-    print('num biased {} vs num fair judged {}'.format(biased_judge, fair_judge))
-
-    Zs_std = Zs.std(dim=1)
-    plt.scatter(Zs_std.detach().cpu().numpy(), true_detection)
-    plt.xlabel('std of Z')
-    plt.ylabel('TP ratio')
-    plt.savefig(os.path.join(args.save_root, 'std_vs_tp.png'),bbox_inches='tight')
-
+    Zs_oriented = Zs + beta* T
     Ys_with_imagenet = torch.cat([Ys, imagenet_Y], dim=0)
-    similarity = calc_similarity(Zs, Ys_with_imagenet)
-    # output top5 similarity
-    top5_similarity = {'query_image_id':[], 'acc(scene_id)':[],
+    similarity = calc_similarity(Zs_oriented, Ys_with_imagenet)
+    top5_similarity = {'query_image_id':[],
                        'top1_image_id':[], 'top2_image_id':[], 'top3_image_id':[], 'top4_image_id':[], 'top5_image_id':[]}
 
-    acc_per_sample = np.zeros(len(similarity))
-    for i in range(len(similarity)):
-        acc_per_sample[i] = np.sum(similarity[i,:] < similarity[i,i]) / (similarity.shape[1]-1)
 
-    print('scene identification acc with imagenet_val: ', acc_per_sample.mean())
-    # import pdb; pdb.set_trace()
     for i, l in enumerate(Ls):
         sim_vec = similarity[i,:]
         top5_similarity['query_image_id'].append(l)
-        top5_similarity['acc(scene_id)'].append(acc_per_sample[i])
         ranking = np.argsort(sim_vec)[::-1][:5] + 1 # 1始まりにする
         for k in range(1,6):
             key = f'top{k}_image_id'
@@ -388,8 +236,9 @@ def run(args: DictConfig) -> None:
                 image_name = imagenet_name[ranking[k-1]-50-1]
             top5_similarity[key].append(image_name)
     top5_similarity = pd.DataFrame(top5_similarity)
-    top5_similarity.to_csv(os.path.join(args.save_root, 'top5_with_imagenet_val.csv'))
-    # import pdb; pdb.set_trace()
+    top5_similarity.to_csv(os.path.join(args.save_root, 'top5_with_imagenet_val_beta{}.csv'.format(beta)))
+
+
 
 def save_top5_prediction():
     top5_similarity = pd.read_csv(os.path.join(args.save_root, 'top5_with_imagenet_val.csv'))
@@ -417,8 +266,6 @@ def save_top5_prediction():
         image_tiles = np.concatenate(image_tiles, axis=1)
         pil_img = Image.fromarray(image_tiles)
         pil_img.save(os.path.join(args.save_root, f'top5_with_imagenet_val-{i}.png'))
-        # cv2.write_image(os.path.join(args.save_root, f'top5_with_imagenet_val-{i}.png'), image_tiles)
-
 
 
 def boxplot_and_plot(bp_array, plot_array_label, ax):
@@ -441,41 +288,23 @@ def calc_similarity(x, y):
             similarity[i, j] = (x[i] @ y[j]) / max((x[i].norm() * y[j].norm()), 1e-8)
     return similarity.cpu().numpy()
 
-def evaluate(Z, Y):
-    # Z: (batch_size, 512)
-    # Y: (gt_size, 512)
-    binary_confusion_matrix = np.zeros([len(Z), len(Y)])
-    similarity = calc_similarity(Z, Y)
-    acc_tmp = np.zeros(len(similarity))
-    for i in range(len(similarity)):
-        acc_tmp[i] = np.sum(similarity[i,:] < similarity[i,i]) / (similarity.shape[1]-1)
-        binary_confusion_matrix[i,similarity[i,:] < similarity[i,i]] = 1
-        binary_confusion_matrix[i,similarity[i,:] > similarity[i,i]] = -1
-    similarity_acc = np.mean(acc_tmp)
-
-
-    print('Similarity Acc', similarity_acc)
-
-    return similarity_acc, binary_confusion_matrix
-
-def vis_confusion_mat(mat, acc, savefile=None):
-    sns.heatmap(mat, square=True, annot=False)
-    plt.xlabel('database data')
-    plt.ylabel('query data')
-    plt.title('similarity acc: {}'.format(acc))
-    plt.savefig(savefile)
-    plt.close()
-    print('saved to ', savefile)
-
 
 if __name__ == "__main__":
+    prompt_root = '/home/yainoue/meg2image/codes/MEG-decoding/data/prompts'
+    prompt_sub_dir = 'music'
+    prompt_dir = os.path.join(prompt_root, prompt_sub_dir)
+    prompt_dict_file = os.path.join(prompt_dir, 'classification1.json')
+    with open(prompt_dict_file, 'r') as f:
+        prompt_dict = json.load(f)
+    text_features, prompts =  get_language_model(prompt_dict, prompt_dir)
+    print('use prompt: ', prompts)
     from hydra import initialize, compose
     with initialize(version_base=None, config_path="../configs/"):
         args = compose(config_name='20230429_sbj01_eegnet_regression')
-        # args = compose(config_name='20230501_all_eegnet_regression')
-        # args = compose(config_name='20230425_sbj01_seq2stat')
     if not os.path.exists(os.path.join(args.save_root, 'weights')):
         os.makedirs(os.path.join(args.save_root, 'weights'))
-    # run(args)
+    args.save_root = os.path.join(args.save_root, 'text_oriented')
+    if not os.path.exists(args.save_root):
+        os.makedirs(args.save_root)
 
     save_top5_prediction()
