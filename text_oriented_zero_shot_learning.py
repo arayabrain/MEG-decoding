@@ -5,7 +5,6 @@ from tqdm import tqdm, trange
 from termcolor import cprint
 # import wandb
 import pandas as pd
-from omegaconf import DictConfig, open_dict
 import json
 
 from constants import device
@@ -17,20 +16,50 @@ from constants import device
 #     Gwilliams2022Collator,
 # )
 from torch.utils.data import DataLoader
+try:
+    # import cv2
+    from omegaconf import DictConfig, open_dict
+    from meg_decoding.models import get_model, Classifier
+    from meg_decoding.utils.get_dataloaders import get_dataloaders, get_samplers
+    from meg_decoding.utils.loss import *
+    from meg_decoding.dataclass.god import GODDatasetBase, GODCollator
+    from meg_decoding.utils.loggers import Pickleogger
+    # from meg_decoding.clip_utils.get_embedding import get_language_model
+    from torch.utils.data.dataset import Subset
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import pickle
+    from PIL import Image
+except ModuleNotFoundError :
+    pass
 
-from meg_decoding.models import get_model, Classifier
-from meg_decoding.utils.get_dataloaders import get_dataloaders, get_samplers
-from meg_decoding.utils.loss import *
-from meg_decoding.dataclass.god import GODDatasetBase, GODCollator
-from meg_decoding.utils.loggers import Pickleogger
-from meg_decoding.clip_utils.get_embedding import get_language_model
-from torch.utils.data.dataset import Subset
-import matplotlib.pyplot as plt
-import seaborn as sns
-import pickle
-from PIL import Image
+def get_language_model(prompt_dict:dict, savedir):
+    if os.path.exists(os.path.join(savedir, 'text_features')):
+        
+        text_features = torch.load(os.path.join(savedir, 'text_features'))
+        with open(os.path.join(savedir, 'prompts.txt'), 'r') as f:
+            prompts = f.readlines()
+    else:
+        import clip
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model, preprocess = clip.load("ViT-B/32", device=device)
+        model = model.eval()
+        prompts = []
+        prefix = prompt_dict['prefix']
+        for i, t in prompt_dict.items():
+            if i == 'prefix':
+                continue
+            prompts.append(t+'\n')
+        text = clip.tokenize([prefix + s.replace('\n','') for s in prompts]).to(device)
+        with torch.no_grad():
+            text_features = model.encode_text(text)
+        # with open(os.path.join(savedir, 'text_features'), 'wb') as f:
+        torch.save(text_features, os.path.join(savedir, 'text_features'))
+        with open(os.path.join(savedir, 'prompts.txt'), 'w') as f:
+            f.writelines(prompts)
+    return text_features, prompts
 
-def run(args: DictConfig, prompts:list, text_embeddings:list) -> None:
+def run(args, prompts:list, text_embeddings:list, beta:float) -> None:
 
     from meg_decoding.utils.reproducibility import seed_worker
     # NOTE: We do need it (IMHO).
@@ -141,7 +170,7 @@ def run(args: DictConfig, prompts:list, text_embeddings:list) -> None:
     # ---------------------
     brain_encoder = get_model(args).to(device) #BrainEncoder(args).to(device)
 
-    weight_dir = os.path.join(args.save_root, 'weights')
+    weight_dir = os.path.join(os.path.join('/',*args.save_root.split('/')[:-2]), 'weights')
     last_weight_file = os.path.join(weight_dir, "model_last.pt")
     best_weight_file = os.path.join(weight_dir, "model_best.pt")
     if os.path.exists(best_weight_file):
@@ -213,10 +242,10 @@ def run(args: DictConfig, prompts:list, text_embeddings:list) -> None:
     Zs = Zs / Zs.std(dim=1, keepdims=True)
 
     # prompt orienting
-    T = text_embeddings[0].to(device)
+    T = text_embeddings.cpu().numpy()
     T = T - source_dataset.mean_Y
     T = T / source_dataset.std_Y
-
+    T = torch.Tensor(T).to(device)
     Zs_oriented = Zs + beta* T
     Ys_with_imagenet = torch.cat([Ys, imagenet_Y], dim=0)
     similarity = calc_similarity(Zs_oriented, Ys_with_imagenet)
@@ -240,8 +269,8 @@ def run(args: DictConfig, prompts:list, text_embeddings:list) -> None:
 
 
 
-def save_top5_prediction():
-    top5_similarity = pd.read_csv(os.path.join(args.save_root, 'top5_with_imagenet_val.csv'))
+def save_top5_prediction(args, beta):
+    top5_similarity = pd.read_csv(os.path.join(args.save_root, 'top5_with_imagenet_val_beta{}.csv'.format(beta)))
     split = 5
     unit = int(len(top5_similarity) / split)
     imagenet_val_root = '/storage/dataset/image/ImageNet/ILSVRC2012_val/'
@@ -259,14 +288,17 @@ def save_top5_prediction():
                     assert image.shape[0] == 112, 'image has shape {}'.format(image.shape)
                 else:
                     image = np.ones([112,112,3]).astype(np.uint8)
+                if image.ndim == 2:
+                    image = np.stack([image]*3, axis=-1)
                 row_image_list.append(image)
             row_image = np.concatenate(row_image_list, axis=0)
             image_tiles.append(row_image)
             # import pdb; pdb.set_trace()
         image_tiles = np.concatenate(image_tiles, axis=1)
         pil_img = Image.fromarray(image_tiles)
-        pil_img.save(os.path.join(args.save_root, f'top5_with_imagenet_val-{i}.png'))
-
+        pil_img.save(os.path.join(args.save_root, f'top5_with_imagenet_val-{i}-beta{beta}.png'))
+        # cv2.write_image(os.path.join(args.save_root, f'top5_with_imagenet_val-beta{beta}-{i}.png'), image_tiles)
+        print('saved as ', os.path.join(args.save_root, f'top5_with_imagenet_val-{i}-beta{beta}.png'))
 
 def boxplot_and_plot(bp_array, plot_array_label, ax):
     # array: n_image x dims(512)
@@ -291,20 +323,24 @@ def calc_similarity(x, y):
 
 if __name__ == "__main__":
     prompt_root = '/home/yainoue/meg2image/codes/MEG-decoding/data/prompts'
-    prompt_sub_dir = 'music'
+    prompt_sub_dir = 'person'
     prompt_dir = os.path.join(prompt_root, prompt_sub_dir)
     prompt_dict_file = os.path.join(prompt_dir, 'classification1.json')
     with open(prompt_dict_file, 'r') as f:
         prompt_dict = json.load(f)
     text_features, prompts =  get_language_model(prompt_dict, prompt_dir)
+    print('subdir: ', prompt_dir)
     print('use prompt: ', prompts)
     from hydra import initialize, compose
     with initialize(version_base=None, config_path="../configs/"):
         args = compose(config_name='20230429_sbj01_eegnet_regression')
     if not os.path.exists(os.path.join(args.save_root, 'weights')):
         os.makedirs(os.path.join(args.save_root, 'weights'))
-    args.save_root = os.path.join(args.save_root, 'text_oriented')
+    args.save_root = os.path.join(args.save_root, 'text_oriented', prompt_sub_dir)
     if not os.path.exists(args.save_root):
         os.makedirs(args.save_root)
-
-    save_top5_prediction()
+    for beta in [0, 0.01, 0.02, 0.1, 0.2, 0.4, 0.8, 1.0, 2.0, 10]:
+        # beta = 1.0
+        run(args, prompts, text_features, beta=beta) 
+        save_top5_prediction(args, beta)
+    
