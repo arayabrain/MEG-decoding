@@ -41,3 +41,4 @@ logs/*
 data/GOD/*.npy
 data/ImageNet/*
 data/prompts/*
+data/COCO/*
