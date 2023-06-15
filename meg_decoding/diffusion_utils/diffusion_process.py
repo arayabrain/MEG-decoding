@@ -43,5 +43,4 @@ def forward_diffusion(sd: SimpleDiffusion, x0: torch.Tensor, timesteps: torch.Te
     mean    = get(sd.sqrt_alpha_cumulative, t=timesteps) * x0  # Image scaled
     std_dev = get(sd.sqrt_one_minus_alpha_cumulative, t=timesteps) # Noise scaled
     sample  = mean + std_dev * eps # scaled inputs * scaled noise
-
     return sample, eps  # return ... , gt noise --> model predicts this)

@@ -19,8 +19,8 @@ class BaseConfig:
     DATASET = "god_train" #  "MNIST", "Cifar-10", "Cifar-100", "Flowers"
 
     # For logging inferece images and saving checkpoints.
-    root_log_dir = os.path.join("results/dp", "logs")
-    root_checkpoint_dir = os.path.join("results/dp", "checkpoints")
+    root_log_dir = os.path.join("/home/yainoue/meg2image/results/dp", "logs")
+    root_checkpoint_dir = os.path.join("/home/yainoue/meg2image/results/dp", "checkpoints")
 
     # Current log and checkpoint directory.
     log_dir = "version_0"
@@ -46,29 +46,35 @@ class ModelConfig:
 def get_dataset(dataset_name='god_train'):
     if 'god' in dataset_name:
         split = dataset_name.split('_')[1]
-        dataset_path = ''
-        dataset = GODFeatureDataset(dataset_path)
+        dataset_path = f'/home/yainoue/meg2image/results/20230429_sbj01_eegnet_cv_norm_regression/features/y_{split}.npy'
+        slice_ = slice(0,1200,1) if split == 'train' else None
+        dataset = GODFeatureDataset(dataset_path, slice=slice_)
+    elif 'coco' in dataset_name:
+        split = dataset_name.split('_')[1]
+        dataset_path = f'/home/yainoue/meg2image/codes/MEG-decoding/data/COCO/unlabeled2017_features.pkl'
+        slice_ = slice(0,1200,1) if split == 'train' else None
+        dataset = GODFeatureDataset(dataset_path, slice=slice_, dim=0)
     else:
         pass
     return dataset
 
-def difussion_demo(savedir):
+def difussion_demo(savedir, device):
     sd = SimpleDiffusion(num_diffusion_timesteps=TrainingConfig.TIMESTEPS, device="cuda")
-
-    loader = iter(  # converting dataloader into an iterator for now.
-        get_dataloader(
-            dataset_name=BaseConfig.DATASET,
-            batch_size=8,
-            device="cuda",
-        )
+    dataset = get_dataset(dataset_name=BaseConfig.DATASET)
+    loader = iter(      # converting dataloader into an iterator for now.
+                get_dataloader(
+                    dataset=dataset,
+                    batch_size=1,
+                    device="cuda",
+                )
     )
-    x0s, _ = next(loader)
-
+    x0s = next(loader)
+    x0s = x0s.to(device)
     noisy_images = []
     specific_timesteps = [0, 10, 50, 100, 150, 200, 250, 300, 400, 600, 800, 999]
 
     for timestep in specific_timesteps:
-        timestep = torch.as_tensor(timestep, dtype=torch.long)
+        timestep = torch.as_tensor(timestep, dtype=torch.long).to(device)
 
         xts, _ = forward_diffusion(sd, x0s, timestep)
 
@@ -79,8 +85,9 @@ def difussion_demo(savedir):
     _, ax = plt.subplots(1, len(noisy_images), figsize=(10, 5), facecolor="white")
 
     for i, (timestep, noisy_sample) in enumerate(zip(specific_timesteps, noisy_images)):
-        noisy_sample = noisy_sample.squeeze(0)
-        ax[i].plot(np.arange(noisy_sample), noisy_sample)
+        noisy_sample = noisy_sample.squeeze()
+        noisy_sample = noisy_sample.detach().cpu().numpy()
+        ax[i].plot(np.arange(len(noisy_sample)), noisy_sample)
         ax[i].set_title(f"t={timestep}", fontsize=8)
         ax[i].axis("off")
         ax[i].grid(False)
@@ -95,8 +102,8 @@ def difussion_demo(savedir):
 
 def fit():
     model = UNet(
-        input_channels          = TrainingConfig.IMG_SHAPE[0],
-        output_channels         = TrainingConfig.IMG_SHAPE[0],
+        input_channels          = TrainingConfig.INPUT_SHAPE[0],
+        output_channels         = TrainingConfig.INPUT_SHAPE[0],
         base_channels           = ModelConfig.BASE_CH,
         base_channels_multiples = ModelConfig.BASE_CH_MULT,
         apply_attention         = ModelConfig.APPLY_ATTENTION,
@@ -106,9 +113,9 @@ def fit():
     model.to(BaseConfig.DEVICE)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=TrainingConfig.LR)
-
+    dataset = get_dataset(dataset_name=BaseConfig.DATASET)
     dataloader = get_dataloader(
-        dataset_name  = BaseConfig.DATASET,
+        dataset  = dataset,
         batch_size    = TrainingConfig.BATCH_SIZE,
         device        = BaseConfig.DEVICE,
         pin_memory    = True,
@@ -119,7 +126,7 @@ def fit():
 
     sd = SimpleDiffusion(
         num_diffusion_timesteps = TrainingConfig.TIMESTEPS,
-        img_shape               = TrainingConfig.IMG_SHAPE,
+        img_shape               = TrainingConfig.INPUT_SHAPE,
         device                  = BaseConfig.DEVICE,
     )
 
@@ -138,7 +145,7 @@ def fit():
 
             # Algorithm 2: Sampling
             reverse_diffusion(model, sd, timesteps=TrainingConfig.TIMESTEPS, num_images=4,
-                save_path=save_path, img_shape=TrainingConfig.IMG_SHAPE, device=BaseConfig.DEVICE,
+                save_path=save_path, img_shape=TrainingConfig.INPUT_SHAPE, device=BaseConfig.DEVICE,
             )
 
             # clear_output()
@@ -148,7 +155,7 @@ def fit():
                 "model": model.state_dict()
             }
             torch.save(checkpoint_dict, os.path.join(checkpoint_dir, "ckpt.tar"))
-            print('{epoch} th Epoch:: Checkpoint saved :', checkpoint_dict)
+            print('{epoch} th Epoch:: Checkpoint saved :', os.path.join(checkpoint_dir, "ckpt.tar"))
             del checkpoint_dict
 
 
@@ -163,10 +170,8 @@ def train_one_epoch(model, sd, loader, optimizer, scaler, loss_fn, epoch=800,
 
         for x0s in loader:
             tq.update(1)
-
             ts = torch.randint(low=1, high=training_config.TIMESTEPS, size=(x0s.shape[0],), device=base_config.DEVICE)
             xts, gt_noise = forward_diffusion(sd, x0s, ts)
-
             with amp.autocast():
                 pred_noise = model(xts, ts)
                 loss = loss_fn(gt_noise, pred_noise)
@@ -219,8 +224,16 @@ def reverse_diffusion(model, sd, timesteps=1000, img_shape=(3, 64, 64),
 
     x = x.squeeze().cpu().numpy()
     plt.figure(figsize=(4, 4))
-    plt.plot(np.arange(x.shape[0]), x)
+    plt.plot(np.arange(x.shape[1]), x.T)
     plt.savefig(kwargs['save_path'], dpi=300, bbox_inches="tight")
     print('reverse diffusion plot saved to', kwargs['save_path'])
     return None
 
+if __name__ == '__main__':
+    demo_save_dir = os.path.join('/home/yainoue/meg2image/results', 'dp', 'demo')
+    os.makedirs(demo_save_dir, exist_ok=True)
+    # os.makedirs(BaseConfig.root_log_dir, exist_ok=True)
+    # os.makedirs(BaseConfig.root_checkpoint_dir, exist_ok=True)
+
+    difussion_demo(demo_save_dir, device=BaseConfig.DEVICE)
+    fit()

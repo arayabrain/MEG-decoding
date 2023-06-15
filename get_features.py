@@ -68,15 +68,15 @@ def run(args: DictConfig, eval_sbj:str='1') -> None:
                                     )
 
     if eval_sbj == '1':
-        ind_tr = list(range(100))# list(range(0, 3000)) + list(range(3600, 6600)) #+ list(range(7200, 21600)) # + list(range(7200, 13200)) + list(range(14400, 20400))
+        ind_tr = list(range(0, 3000)) + list(range(3600, 6600)) #+ list(range(7200, 21600)) # + list(range(7200, 13200)) + list(range(14400, 20400))
         ind_te = list(range(3000,3600)) + list(range(6600, 7200)) # + list(range(13200, 14400)) + list(range(20400, 21600))
         ind_out = list(range(0,50))
     elif eval_sbj == '2':
-        ind_tr = list(range(100))# list(range(7200, 7200+3000)) + list(range(10800, 10800+3000))
+        ind_tr = list(range(7200, 7200+3000)) + list(range(10800, 10800+3000))
         ind_te = list(range(7200+3000, 7200+3600)) + list(range(10800+3000, 10800+3600))
         ind_out = list(range(50,100))
     elif eval_sbj == '3':
-        ind_tr = list(range(100))# list(range(14400, 14400+3000)) + list(range(14400+3600, 14400+6600))
+        ind_tr = list(range(14400, 14400+3000)) + list(range(14400+3600, 14400+6600))
         ind_te = list(range(14400+3000,14400+3600)) + list(range(14400+6600, 14400+7200))
         ind_out = list(range(100,150))
     else:
@@ -107,7 +107,7 @@ def run(args: DictConfig, eval_sbj:str='1') -> None:
         train_loader = DataLoader(
             train_dataset,
             batch_size= args.batch_size,
-            drop_last=True,
+            drop_last=False,
             shuffle=False,
             num_workers=args.num_workers,
             pin_memory=True,
@@ -117,7 +117,7 @@ def run(args: DictConfig, eval_sbj:str='1') -> None:
         val_loader = DataLoader(
             val_dataset, #
             batch_size=50, # args.batch_size,
-            drop_last=True,
+            drop_last=False,
             shuffle=False,
             num_workers=args.num_workers,
             pin_memory=True,
@@ -127,7 +127,7 @@ def run(args: DictConfig, eval_sbj:str='1') -> None:
         test_loader = DataLoader(
             outlier_dataset,  # val_dataset
             batch_size=50, # args.batch_size,
-            drop_last=True,
+            drop_last=False,
             shuffle=False,
             num_workers=args.num_workers,
             pin_memory=True,
@@ -175,7 +175,7 @@ def run(args: DictConfig, eval_sbj:str='1') -> None:
             if len(batch) == 3:
                 X, Y, subject_idxs = batch
             elif len(batch) == 4:
-                X, Y, subject_idxs, labels = batch
+                X, Y, subject_idxs, Labels = batch
             else:
                 raise ValueError("Unexpected number of items from dataloader.")
 
@@ -189,9 +189,11 @@ def run(args: DictConfig, eval_sbj:str='1') -> None:
     train_Zs = torch.cat(train_Zs, dim=0).detach().cpu().numpy()
     train_Ys = torch.cat(train_Ys, dim=0).detach().cpu().numpy()
     train_Ls = torch.cat(train_Ls, dim=0).detach().cpu().numpy()
-    z_savepath = os.path.join(args.save_root, 'z_train.npy')
-    y_savepath = os.path.join(args.save_root, 'y_train.npy')
-    l_savepath = os.path.join(args.save_root, 'l_train.npy')
+    z_savepath = os.path.join(args.save_root, 'features','z_train.npy')
+    y_savepath = os.path.join(args.save_root, 'features', 'y_train.npy')
+    l_savepath = os.path.join(args.save_root, 'features', 'l_train.npy')
+    print('train:', train_Zs.shape)
+    print('saved to: ', z_savepath)
     np.save(z_savepath, train_Zs)
     np.save(y_savepath, train_Ys)
     np.save(l_savepath, train_Ls)
@@ -217,15 +219,16 @@ def run(args: DictConfig, eval_sbj:str='1') -> None:
             val_Ys.append(Y)
             val_Ls.append(Labels)
 
-    val_Zs = torch.cat(val_Zs, dim=0)
-    val_Ys = torch.cat(val_Ys, dim=0)
+    val_Zs = torch.cat(val_Zs, dim=0).detach().cpu().numpy()
+    val_Ys = torch.cat(val_Ys, dim=0).detach().cpu().numpy()
     val_Ls = torch.cat(val_Ls, dim=0).detach().cpu().numpy()
-    z_savepath = os.path.join(args.save_root, 'z_val.npy')
-    y_savepath = os.path.join(args.save_root, 'y_val.npy')
-    l_savepath = os.path.join(args.save_root, 'l_val.npy')
+    z_savepath = os.path.join(args.save_root, 'features', 'z_val.npy')
+    y_savepath = os.path.join(args.save_root, 'features', 'y_val.npy')
+    l_savepath = os.path.join(args.save_root, 'features', 'l_val.npy')
     np.save(z_savepath, val_Zs)
     np.save(y_savepath, val_Ys)
     np.save(l_savepath, val_Ls)
+    print('val: ', val_Zs.shape)
 
 
     test_Zs = []
@@ -250,15 +253,19 @@ def run(args: DictConfig, eval_sbj:str='1') -> None:
             test_Ls.append(Labels)
 
 
-    test_Zs = torch.cat(test_Zs, dim=0)
-    test_Ys = torch.cat(test_Ys, dim=0)
+    test_Zs = torch.cat(test_Zs, dim=0).detach().cpu().numpy()
+    test_Ys = torch.cat(test_Ys, dim=0).detach().cpu().numpy()
     test_Ls = torch.cat(test_Ls, dim=0).detach().cpu().numpy()
-    z_savepath = os.path.join(args.save_root, 'z_test.npy')
-    y_savepath = os.path.join(args.save_root, 'y_test.npy')
-    l_savepath = os.path.join(args.save_root, 'l_test.npy')
+    z_savepath = os.path.join(args.save_root, 'features', 'z_test.npy')
+    y_savepath = os.path.join(args.save_root, 'features', 'y_test.npy')
+    l_savepath = os.path.join(args.save_root, 'features', 'l_test.npy')
     np.save(z_savepath, test_Zs)
     np.save(y_savepath, test_Ys)
     np.save(l_savepath, test_Ls)
+    print('test: ', test_Zs.shape)
+    plt.plot(np.arange(test_Zs.shape[1]), test_Zs[0])
+    plt.plot(np.arange(test_Ys.shape[1]), test_Ys[0])
+    plt.savefig(os.path.join(args.save_root, 'features', 'zy_test.png'))
 
 
 if __name__ == "__main__":
@@ -283,5 +290,5 @@ if __name__ == "__main__":
     #     args.subjects = compose(config_name='pattern_sbj01')
     eval_sbj = '1'
     if not os.path.exists(os.path.join(args.save_root, 'fetures')):
-        os.makedirs(os.path.join(args.save_root, 'features'))
+        os.makedirs(os.path.join(args.save_root, 'features'), exist_ok=True)
     run(args, eval_sbj)

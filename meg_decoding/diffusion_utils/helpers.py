@@ -1,10 +1,10 @@
 import os
-import cv2
 import torch
 from PIL import Image
 from torchvision.utils import make_grid
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
+import pickle
 
 def to_device(data, device):
     """Move tensor(s) to chosen device"""
@@ -43,7 +43,8 @@ def get(element: torch.Tensor, t: torch.Tensor):
         reshape it to have the same dimension as a batch of images.
     """
     ele = element.gather(-1, t)
-    return ele.reshape(-1, 1, 1, 1)
+    # return ele.reshape(-1, 1, 1, 1)
+    return ele.reshape(-1, 1, 1)
 
 def setup_log_directory(config):
     '''Log and Model checkpoint directory Setup'''
@@ -110,8 +111,24 @@ def get_dataloader(dataset,
 
 
 class GODFeatureDataset(Dataset):
-    def __init__(self, data_path):
-        data = np.load(data_path)
+    def __init__(self, data_path, slice=None, dim=None):
+        if 'npy' in data_path:
+            data = np.load(data_path)
+        elif 'pkl' in data_path:
+            with open(data_path, 'rb') as f:
+                raw_data = pickle.load(f)
+            data = np.zeros((len(raw_data), 512))
+            # filepaths = [None] * len(raw_data)
+            cnt = 0
+            for k, v in raw_data.items():
+                data[cnt] = v # v: 512
+                # filepaths[cnt] = os.path.join(COCO_unlabel_root, k)
+                cnt += 1
+
+        if slice is not None:
+            data = data[slice]
+        if dim is not None:
+            data = self.norm_across_dim(data, dim)
         self.data = torch.from_numpy(data).float()
 
     def __len__(self):
@@ -123,4 +140,4 @@ class GODFeatureDataset(Dataset):
         return (data - self.mean) / self.std
 
     def __getitem__(self, idx):
-        return self.data[idx]
+        return self.data[idx].unsqueeze(0) # add ch
