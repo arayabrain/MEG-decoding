@@ -141,3 +141,31 @@ class GODFeatureDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.data[idx].unsqueeze(0) # add ch
+
+class GODDenoiseDataset(Dataset):
+    def __init__(self, z_path, y_path, l_path):
+
+        z_data = np.load(z_path)
+        z_data = self.norm_across_dim(z_data, dim=0)
+        y_data = np.load(y_path)
+        l_data = np.load(l_path)
+        # sort
+        l_sort = np.argsort(l_data)
+        z_data = z_data[l_sort]
+        y_data = y_data[l_sort]
+        l_data = l_data[l_sort]
+
+        self.z_data = torch.from_numpy(z_data).float()
+        self.y_data = torch.from_numpy(y_data).float()
+        self.l_data = l_data
+
+    def __len__(self):
+        return len(self.z_data)
+
+    def norm_across_dim(self, data, dim):
+        self.std = data.std(axis=dim, keepdims=True)
+        self.mean = data.mean(axis=dim, keepdims=True)
+        return (data - self.mean) / self.std
+
+    def __getitem__(self, idx):
+        return self.z_data[idx].unsqueeze(0), self.y_data[idx].unsqueeze(0), self.l_data[idx]  # add ch
