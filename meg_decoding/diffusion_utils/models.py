@@ -60,7 +60,7 @@ class ResnetBlock(nn.Module):
 
         # Group 3
         self.normlize_2 = nn.GroupNorm(num_groups=8, num_channels=self.out_channels)
-        self.dropout = nn.Dropout2d(p=dropout_rate)
+        self.dropout = nn.Dropout1d(p=dropout_rate)
         self.conv_2 = nn.Conv1d(in_channels=self.out_channels, out_channels=self.out_channels, kernel_size=3, stride=1, padding="same")
 
         if self.in_channels != self.out_channels:

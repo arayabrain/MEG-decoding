@@ -24,8 +24,7 @@ class BaseConfig:
     root_output_dir = '/home/yainoue/meg2image/results/20230429_sbj01_eegnet_cv_norm_regression/features/dp'
 
     # Current log and checkpoint directory.
-    log_dir = "version_0"
-    checkpoint_dir = "version_0"
+    checkpoint_dir = "version_7"
 
 @dataclass
 class TrainingConfig:
@@ -40,19 +39,22 @@ class TrainingConfig:
 class ModelConfig:
     BASE_CH = 64  # 64, 128, 256, 256
     BASE_CH_MULT = (1, 2, 4, 4) # 32, 16, 8, 8
-    APPLY_ATTENTION = (True, True, True, True)
+    APPLY_ATTENTION = (False, True, True, False)#(True, True, True, True)
     DROPOUT_RATE = 0.1
     TIME_EMB_MULT = 4 # 128
 
-def get_dataset(dataset_name='god_train'):
+def get_dataset(dataset_name='god_train', slice_=None):
     if 'god' in dataset_name:
         split = dataset_name.split('_')[1]
-        dataset_path = '/home/yainoue/meg2image/results/20230429_sbj01_eegnet_cv_norm_regression/features/{kind}_{split}.npy'.format(split=split)
+        dataset_path = '/home/yainoue/meg2image/results/20230429_sbj01_eegnet_cv_norm_regression/features/{kind}_{split}.npy'
 
-        dataset = GODDenoiseDataset(dataset_path.format(kind='z'), dataset_path.format(kind='y'), dataset_path.format(kind='l'))
+        dataset = GODDenoiseDataset(dataset_path.format(kind='z', split=split), 
+                                    dataset_path.format(kind='y', split=split), 
+                                    dataset_path.format(kind='l', split=split),
+                                    slice_=slice_)
     return dataset
 
-def diffusion_and_denoise(savedir, device, checkpoint_dir):
+def diffusion_and_denoise(device, checkpoint_dir, slice_=None):
     model = UNet(
         input_channels          = TrainingConfig.INPUT_SHAPE[0],
         output_channels         = TrainingConfig.INPUT_SHAPE[0],
@@ -64,8 +66,9 @@ def diffusion_and_denoise(savedir, device, checkpoint_dir):
     )
     model.load_state_dict(torch.load(os.path.join(checkpoint_dir, "ckpt.tar"), map_location='cpu')['model'])
     model.to(BaseConfig.DEVICE)
+    model.eval()
 
-    dataset = get_dataset(dataset_name=BaseConfig.DATASET)
+    dataset = get_dataset(dataset_name=BaseConfig.DATASET, slice_=slice_)
 
     sd = SimpleDiffusion(
         num_diffusion_timesteps = TrainingConfig.TIMESTEPS,
@@ -78,13 +81,13 @@ def diffusion_and_denoise(savedir, device, checkpoint_dir):
     y_embeddings = []
     l_list = []
     ts = torch.ones(1, dtype=torch.long, device=BaseConfig.DEVICE) * (TrainingConfig.TIMESTEPS-1)
-    for z,y,l in dataset:
+    
+    for z,y,l in tqdm(dataset):
         z = z.to(device)
         y = y.to(device)
-        l = l.to(device)
         z_embeddings.append(z)
-        x0s = z
-        xts, _ = forward_diffusion(sd, x0s, TrainingConfig.TIMESTEPS-1)
+        x0s = y# z
+        xts, _ = forward_diffusion(sd, x0s, ts)
 
         n_noise = torch.randn_like(xts)
         predicted_noise = model(xts, ts)
@@ -98,9 +101,8 @@ def diffusion_and_denoise(savedir, device, checkpoint_dir):
             + torch.sqrt(beta_t) * n_noise
         )
 
-        xts = xts.detach()
+        xts = xts.detach().squeeze(0)
         y = y.detach()
-        l = l.detach().cpu().item()
         xts_embeddings.append(xts)
         y_embeddings.append(y)
         l_list.append(l)
@@ -124,8 +126,10 @@ def run():
 
     savedir = os.path.join(BaseConfig.root_output_dir, BaseConfig.DATASET)
     os.makedirs(savedir, exist_ok=True)
-    version = 1
-    z_embeddings, xts_embeddings, y_embeddings, l_list = diffusion_and_denoise(savedir, BaseConfig.DEVICE, os.path.join(BaseConfig.root_checkpoint_dir, version))
+    z_embeddings, xts_embeddings, y_embeddings, l_list = diffusion_and_denoise(BaseConfig.DEVICE, 
+                                                                               os.path.join(BaseConfig.root_checkpoint_dir, 
+                                                                                            BaseConfig.checkpoint_dir),
+                                                                                slice_=slice(0,600,1))
     print(l_list)
     calculate_correlation(z_embeddings, savedir, 'z_corr.png')
     calculate_correlation(xts_embeddings, savedir, 'xts_corr.png')
@@ -135,5 +139,4 @@ def run():
 
 
 if __name__ == '__main__':
-    demo_save_dir = os.path.join('/home/yainoue/meg2image/results', 'dp', 'demo')
-    os.makedirs(demo_save_dir, exist_ok=True)
+    run()

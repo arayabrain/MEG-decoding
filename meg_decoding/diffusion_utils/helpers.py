@@ -143,7 +143,7 @@ class GODFeatureDataset(Dataset):
         return self.data[idx].unsqueeze(0) # add ch
 
 class GODDenoiseDataset(Dataset):
-    def __init__(self, z_path, y_path, l_path):
+    def __init__(self, z_path, y_path, l_path, slice_=None):
 
         z_data = np.load(z_path)
         z_data = self.norm_across_dim(z_data, dim=0)
@@ -151,6 +151,8 @@ class GODDenoiseDataset(Dataset):
         l_data = np.load(l_path)
         # sort
         l_sort = np.argsort(l_data)
+        if slice_ is not None:
+            l_sort = l_sort[slice_]
         z_data = z_data[l_sort]
         y_data = y_data[l_sort]
         l_data = l_data[l_sort]

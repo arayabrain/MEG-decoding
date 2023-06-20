@@ -16,7 +16,7 @@ import gc
 @dataclass
 class BaseConfig:
     DEVICE = get_default_device()
-    DATASET = "god_train" #  "MNIST", "Cifar-10", "Cifar-100", "Flowers"
+    DATASET = ["god_train", "coco"] #  "MNIST", "Cifar-10", "Cifar-100", "Flowers"
 
     # For logging inferece images and saving checkpoints.
     root_log_dir = os.path.join("/home/yainoue/meg2image/results/dp", "logs")
@@ -31,36 +31,40 @@ class TrainingConfig:
     TIMESTEPS = 1000 # Define number of diffusion timesteps
     INPUT_SHAPE = (1, 512)
     NUM_EPOCHS = 800
-    BATCH_SIZE = 32
-    LR = 2e-4
+    BATCH_SIZE = 64
+    LR = 2e-5# 2e-4
     NUM_WORKERS = 2
 
 @dataclass
 class ModelConfig:
     BASE_CH = 64  # 64, 128, 256, 256
     BASE_CH_MULT = (1, 2, 4, 4) # 32, 16, 8, 8
-    APPLY_ATTENTION = (True, True, True, True)
+    APPLY_ATTENTION = (False, True, True, False)#(True, True, True, True)
     DROPOUT_RATE = 0.1
     TIME_EMB_MULT = 4 # 128
 
-def get_dataset(dataset_name='god_train'):
-    if 'god' in dataset_name:
-        split = dataset_name.split('_')[1]
-        dataset_path = f'/home/yainoue/meg2image/results/20230429_sbj01_eegnet_cv_norm_regression/features/y_{split}.npy'
-        slice_ = slice(0,1200,1) if split == 'train' else None
-        dataset = GODFeatureDataset(dataset_path, slice=slice_)
-    elif 'coco' in dataset_name:
-        split = dataset_name.split('_')[1]
-        dataset_path = f'/home/yainoue/meg2image/codes/MEG-decoding/data/COCO/unlabeled2017_features.pkl'
-        slice_ = slice(0,1200,1) if split == 'train' else None
-        dataset = GODFeatureDataset(dataset_path, slice=slice_, dim=0)
-    else:
-        pass
+def get_dataset(dataset_names=['god_train']):
+    dataset_list = []
+    for dataset_name in dataset_names:
+        if 'god' in dataset_name:
+            split = dataset_name.split('_')[1]
+            dataset_path = f'/home/yainoue/meg2image/results/20230429_sbj01_eegnet_cv_norm_regression/features/y_{split}.npy'
+            slice_ = slice(0,1200,1) if split == 'train' else None
+            dataset = GODFeatureDataset(dataset_path, slice=slice_)
+        elif 'coco' in dataset_name:
+            dataset_path = f'/home/yainoue/meg2image/codes/MEG-decoding/data/COCO/unlabeled2017_features.pkl'
+            slice_=None
+            dataset = GODFeatureDataset(dataset_path, slice=slice_, dim=0)
+        else:
+            pass
+        dataset_list.append(dataset)
+    dataset = torch.utils.data.ConcatDataset(dataset_list)
+    print('dataset_length: ', len(dataset))
     return dataset
 
 def difussion_demo(savedir, device):
     sd = SimpleDiffusion(num_diffusion_timesteps=TrainingConfig.TIMESTEPS, device="cuda")
-    dataset = get_dataset(dataset_name=BaseConfig.DATASET)
+    dataset = get_dataset(dataset_names=BaseConfig.DATASET)
     loader = iter(      # converting dataloader into an iterator for now.
                 get_dataloader(
                     dataset=dataset,
@@ -100,7 +104,7 @@ def difussion_demo(savedir, device):
     plt.close()
 
 
-def fit():
+def fit(checkpoint_dir=None):
     model = UNet(
         input_channels          = TrainingConfig.INPUT_SHAPE[0],
         output_channels         = TrainingConfig.INPUT_SHAPE[0],
@@ -110,10 +114,13 @@ def fit():
         dropout_rate            = ModelConfig.DROPOUT_RATE,
         time_multiple           = ModelConfig.TIME_EMB_MULT,
     )
+    if checkpoint_dir is not None:
+        print('load weight:', checkpoint_dir)
+        model.load_state_dict(torch.load(os.path.join(checkpoint_dir, "ckpt.tar"), map_location='cpu')['model'])
     model.to(BaseConfig.DEVICE)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=TrainingConfig.LR)
-    dataset = get_dataset(dataset_name=BaseConfig.DATASET)
+    dataset = get_dataset(dataset_names=BaseConfig.DATASET)
     dataloader = get_dataloader(
         dataset  = dataset,
         batch_size    = TrainingConfig.BATCH_SIZE,
@@ -236,4 +243,5 @@ if __name__ == '__main__':
     # os.makedirs(BaseConfig.root_checkpoint_dir, exist_ok=True)
 
     difussion_demo(demo_save_dir, device=BaseConfig.DEVICE)
-    fit()
+    checkpoint_dir = '/home/yainoue/meg2image/results/dp/checkpoints/version_6'
+    fit(checkpoint_dir)

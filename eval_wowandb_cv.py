@@ -196,8 +196,8 @@ def run(args: DictConfig, eval_sbj:str='1') -> None:
                 generator=g,
             )
             test_loader = DataLoader(
-                val_dataset, # 
-                # outlier_dataset,  # val_dataset
+                # val_dataset, # 
+                outlier_dataset,  # val_dataset
                 batch_size=50, # args.batch_size,
                 drop_last=True,
                 shuffle=False,
@@ -415,7 +415,15 @@ def evaluate(Z, Y):
         binary_confusion_matrix[i,similarity[i,:] < similarity[i,i]] = 1 
         binary_confusion_matrix[i,similarity[i,:] > similarity[i,i]] = -1 
     similarity_acc = np.mean(acc_tmp)
-    
+    # import pdb; pdb.set_trace() 
+    top10_acc = []
+    for i in range(len(similarity)):
+        if np.sum(similarity[i,:] > similarity[i,i]) < 10:
+            top10_acc.append(1)
+        else:
+            top10_acc.append(0)
+    print('top10 acc: /{}'.format(Y.shape[0]), np.mean(top10_acc))
+
 
     print('Similarity Acc', similarity_acc)
     
@@ -435,7 +443,7 @@ if __name__ == "__main__":
     from hydra import initialize, compose
     with initialize(version_base=None, config_path="../configs/"):
         args = compose(config_name='20230427_sbj01_eegnet')
-        # args = compose(config_name='20230429_sbj01_eegnet_regression')
+        args = compose(config_name='20230429_sbj01_eegnet_regression')
         # args = compose(config_name='20230501_all_eegnet_regression')
         # args = compose(config_name='20230425_sbj01_seq2stat')
         # args = compose(config_name='20230515_sbj02_eegnet_regression')
@@ -447,7 +455,7 @@ if __name__ == "__main__":
         # args = compose(config_name='20230531_sbj02_eegnet_regression_src_reconst')
         # args = compose(config_name='20230601_sbj03_eegnet_regression_src_reconst')
         # args = compose(config_name='20230606_sbj02_eegnet')
-        args = compose(config_name='20230607_sbj03_eegnet')
+        # args = compose(config_name='20230607_sbj03_eegnet')
     # for subset of 20230501
     # with initialize(version_base=None, config_path="../configs/subjects"):
     #     args.subjects = compose(config_name='pattern_sbj01')
