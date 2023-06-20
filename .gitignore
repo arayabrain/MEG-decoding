@@ -31,7 +31,9 @@ outputs/
 tmp/
 runs/
 wandb/
-
+python/
+fMRI/
+results/*
 # Micellaneous
 *.pt
 train.sh
