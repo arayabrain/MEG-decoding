@@ -155,7 +155,7 @@ def main():
             Zs, Ys, Ls \
                 = get_averaged_feature(pred_y_pt, true_y_pt, test_label_pt)
             evaluate(Zs, Ys)
-            continue
+            # continue
 
         dist = DistComp(lockdir='tmp', comp_id=analysis_id)
         if dist.islocked():
@@ -174,6 +174,7 @@ def main():
 
         y = data_feature.select(feat)             # Image features
         y_label = data_feature.select('ImageID')  # Image labels
+        import pdb; pdb.set_trace()
 
         # For quick demo, reduce the number of units from 1000 to 100
         # y = y[:, :100]
@@ -190,9 +191,12 @@ def main():
         x_train = x[i_train, :]
         x_test = x[i_test, :]
 
-        y_train = y_sorted[i_train, :] # 1750
-        y_test = y_sorted[i_test, :] # 500
+        y_train = y_sorted[i_train, :] # 1200
+        y_test = y_sorted[i_test, :] # 1750 + 500
         import pdb; pdb.set_trace()
+        if feat == 'clip':
+            train_features_path = 'work\project\MEG_GOD\GOD_dataset\clip_image_training.mat'
+            y =
 
         # Feature prediction
         pred_y, true_y = feature_prediction(x_train, y_train,
