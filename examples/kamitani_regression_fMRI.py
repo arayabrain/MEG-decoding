@@ -47,8 +47,8 @@ class Config():
     #             'Subject3' : ['fMRI/data/Subject3.h5'],
     #             'Subject4' : ['fMRI/data/Subject4.h5'],
     #             'Subject5' : ['fMRI/data/Subject5.h5']}
-    subjects = {'Subject1' : ['fMRI/data/Subject1.h5'], # top10 acc: /50 0.7 Similarity Acc 0.819 (n_units=1000, N=35)  top10 acc: /50 0.7 Similarity Acc 0.815 (n_units=1000, N=6)
-                'Subject2' : ['fMRI/data/Subject2.h5'] # top10 acc: /50 0.64 Similarity Acc 0.796 (n_units=1000, N=35) top10 acc: /50 0.58 Similarity Acc  0.749 (n_units=1000, N=6)
+    subjects = {'Subject1' : ['data/fMRI/Subject1.h5'], # top10 acc: /50 0.7 Similarity Acc 0.819 (n_units=1000, N=35)  top10 acc: /50 0.7 Similarity Acc 0.815 (n_units=1000, N=6)
+                'Subject2' : ['data/fMRI/Subject2.h5'] # top10 acc: /50 0.64 Similarity Acc 0.796 (n_units=1000, N=35) top10 acc: /50 0.58 Similarity Acc  0.749 (n_units=1000, N=6)
                 }
 
     rois = {'VC' : 'ROI_VC = 1'}#,
@@ -73,13 +73,14 @@ class Config():
                 'FFA' : 500,
                 'PPA' : 500}
 
-    image_feature_file = 'fMRI/data/ImageFeatures.h5'
+    image_feature_file = 'data/fMRI/ImageFeatures.h5'
     # features = ['cnn1', 'cnn2', 'cnn3', 'cnn4', 'cnn5', 'cnn6', 'cnn7', 'cnn8', 'hmax1', 'hmax2', 'hmax3', 'gist', 'sift']
     features = ['cnn5']
+    use_clip = False
 
     # Results settings
-    results_dir = os.path.join('results', analysis_name)
-    results_file = os.path.join('results', analysis_name + '.pkl')
+    results_dir = os.path.join('../results', analysis_name)
+    results_file = os.path.join('../results', analysis_name + '.pkl')
 
     # Figure settings
     # roi_labels = ['V1', 'V2', 'V3', 'V4', 'LOC', 'FFA', 'PPA', 'LVC', 'HVC', 'VC']
@@ -147,20 +148,21 @@ def main():
             print('%s is already done. Skipped.' % analysis_id)
             with open(results_file, 'rb') as f:
                 results = pickle.load(f)
-            # Zs = results['predicted_feature_averaged'][0]
-            # Ys = results['true_feature_averaged'][0]
-            pred_y_pt = results['predicted_feature'][0][:50]
-            true_y_pt = results['true_feature'][0][:50]
-            test_label_pt = results['test_label'][0][:50]
-            Zs, Ys, Ls \
-                = get_averaged_feature(pred_y_pt, true_y_pt, test_label_pt)
+            Zs = results['predicted_feature_averaged'][0]
+            Ys = results['true_feature_averaged'][0]
+            # pred_y_pt = results['predicted_feature'][0][:300]
+            # true_y_pt = results['true_feature'][0][:300]
+            # test_label_pt = results['test_label'][0][:300]
+            # Zs, Ys, Ls \
+            #     = get_averaged_feature(pred_y_pt, true_y_pt, test_label_pt)
+            print('Zs mean:', np.mean(Zs))
             evaluate(Zs, Ys)
             # continue
 
         dist = DistComp(lockdir='tmp', comp_id=analysis_id)
-        if dist.islocked():
-            print('%s is already running. Skipped.' % analysis_id)
-            continue
+        # if dist.islocked():
+        #     print('%s is already running. Skipped.' % analysis_id)
+        #     continue
 
         dist.lock()
 
@@ -174,7 +176,6 @@ def main():
 
         y = data_feature.select(feat)             # Image features
         y_label = data_feature.select('ImageID')  # Image labels
-        import pdb; pdb.set_trace()
 
         # For quick demo, reduce the number of units from 1000 to 100
         # y = y[:, :100]
@@ -192,11 +193,18 @@ def main():
         x_test = x[i_test, :]
 
         y_train = y_sorted[i_train, :] # 1200
-        y_test = y_sorted[i_test, :] # 1750 + 500
-        import pdb; pdb.set_trace()
-        if feat == 'clip':
-            train_features_path = 'work\project\MEG_GOD\GOD_dataset\clip_image_training.mat'
-            y =
+        y_test = y_sorted[i_test, :] # 1750+500
+        if config.use_clip:
+            import mat73
+            train_features_path = '/work/project/MEG_GOD/GOD_dataset/clip_image_training.mat'
+            test_features_path = '/work/project/MEG_GOD/GOD_dataset/clip_image_test.mat'
+            train_data = mat73.loadmat(train_features_path)
+            test_data = mat73.loadmat(test_features_path)
+            # import pdb; pdb.set_trace()
+            y = np.concatenate([train_data['vec'], test_data['vec']], axis=0)
+            y_sorted = get_refdata(y, y_label, labels)
+            y_train = y_sorted[i_train, :] # 1200
+            y_test = y_sorted[i_test, :] # 1750+500
 
         # Feature prediction
         pred_y, true_y = feature_prediction(x_train, y_train,
@@ -232,8 +240,8 @@ def main():
         y_catlabels = data_feature.select('CatID')   # Category labels in image features
         ind_catave = (data_feature.select('FeatureType') == 3).flatten()
 
-        y_catave_pt = get_refdata(y[ind_catave, :], y_catlabels[ind_catave, :], catlabels_set_pt)
-        y_catave_im = get_refdata(y[ind_catave, :], y_catlabels[ind_catave, :], catlabels_set_im)
+        # y_catave_pt = get_refdata(y[ind_catave, :], y_catlabels[ind_catave, :], catlabels_set_pt)
+        # y_catave_im = get_refdata(y[ind_catave, :], y_catlabels[ind_catave, :], catlabels_set_im)
 
         # Prepare result dataframe
         results = pd.DataFrame({'subject' : [sbj, sbj],
@@ -247,7 +255,8 @@ def main():
                                 'true_feature_averaged' : [true_y_pt_av, true_y_im_av],
                                 'predicted_feature_averaged' : [pred_y_pt_av, pred_y_im_av],
                                 'category_label_set' : [catlabels_set_pt, catlabels_set_im],
-                                'category_feature_averaged' : [y_catave_pt, y_catave_im]})
+                                # 'category_feature_averaged' : [y_catave_pt, y_catave_im]
+                                })
 
         # Save results
         makedir_ifnot(os.path.dirname(results_file))

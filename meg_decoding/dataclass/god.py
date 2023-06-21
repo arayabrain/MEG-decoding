@@ -15,7 +15,9 @@ from meg_decoding.utils.preproc_utils import (
 )
 import scipy.io
 mne.set_log_level(verbose="WARNING")
+import bdpy
 
+IMAGE_FEATURE_PATH = '/home/yainoue/meg2image/codes/MEG-decoding/data/fMRI/ImageFeatures.h5'
 
 def normalize_per_unit(tensor, subs, return_stats=False):
     print('normalize image_feature along unit dim')
@@ -43,13 +45,13 @@ def normalize_per_unit(tensor, subs, return_stats=False):
 
 class GODDatasetBase(Dataset):
     def __init__(self, args, split, preprocess_pipleine:list=[], return_label:bool=False,
-                 mean_X=None, mean_Y=None, std_X=None, std_Y=None):
+                 mean_X=None, mean_Y=None, std_X=None, std_Y=None, feature_layer='clip'):
         self.args = args
         self.sub_id_map = {s:i for i, s in enumerate(list(self.args.subjects.keys()))}
         self.preprocess_pipeline = preprocess_pipleine
         # prepare dataset
         meg_epochs, sub_epochs, label_epochs, \
-            image_feature_epochs = self.prepare_data(args, split=split)
+            image_feature_epochs = self.prepare_data(args, split=split, feature_layer=feature_layer)
 
         self.X = meg_epochs.astype(np.float32) # epochs x ch x time_samples
         self.Y = image_feature_epochs.astype(np.float32) # epochs x dims
@@ -103,7 +105,7 @@ class GODDatasetBase(Dataset):
         else:
             return x, y, s
 
-    def prepare_data(self, args, split:str):
+    def prepare_data(self, args, split:str, feature_layer:str='clip'):
         DATAROOT = args.data_root
         processed_meg_path_pattern = os.path.join(DATAROOT, '{sub}/mat/{name}')
         label_path_pattern = os.path.join(DATAROOT, '{sub}/labels/{name}')
@@ -206,7 +208,20 @@ class GODDatasetBase(Dataset):
         print('dataset is created. size is ', meg_epochs.shape)
         # if split == 'val':
         #     meg_epochs, image_feature_epochs, sub_epochs, label_epochs = self.avg_same_image_sub_epochs(meg_epochs, image_feature_epochs, sub_epochs, label_epochs)
-
+        if feature_layer != 'clip':
+            data_feature = bdpy.BData(IMAGE_FEATURE_PATH)
+            cnn_data = data_feature.select(feature_layer)
+            print('get {} layer features'.format(feature_layer))
+            if split == 'train' or split == 'val':
+                indices = slice(0, 1200, 1)
+            elif split=='test':
+                indices = slice(1200, 1250, 1)
+            else:
+                raise ValueError('split should be train, val or test')
+            image_feature_epochs = cnn_data[indices, :]
+            image_feature_epochs = image_feature_epochs[label_epochs, :]
+            # TODO: labelが1始まりかchek
+            import pdb; pdb.set_trace()
         return meg_epochs, sub_epochs, label_epochs, image_feature_epochs
 
     def avg_same_image_sub_epochs(self, Xs, Ys, subs, labels):

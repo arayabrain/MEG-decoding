@@ -14,3 +14,6 @@ torchaudio==0.12.1+cu113
 tqdm==4.64.0
 transformers==4.24.0
 seaborn
+h5py
+git+https://github.com/KamitaniLab/bdpy.git
+git+https://github.com/KamitaniLab/slir.git
