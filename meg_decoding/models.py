@@ -76,7 +76,8 @@ class EEGNetCogitat(nn.Module):
 
         self.n_dim = self.compute_dim(num_channels, T)
         self.align1 = CogitatDeepSetNorm(self.n_dim, 8, self.n_dim, n_subs)
-        self.classifier = nn.Linear(self.n_dim, 512, bias=True)
+        out_features = 512 if not 'out_features' in args.keys() else args['out_features']
+        self.classifier = nn.Linear(self.n_dim, out_features, bias=True)
 
 
     def forward(self, x, sbj_idxs):
@@ -165,7 +166,9 @@ class EEGNet(nn.Module):
         )
 
         self.n_dim = self.compute_dim(num_channels, T)
-        self.classifier = nn.Linear(self.n_dim, 512, bias=True)
+        out_features = 512 if not 'out_features' in args.keys() else args['out_features']
+        self.classifier = nn.Linear(self.n_dim, out_features, bias=True)
+        # self.classifier = nn.Linear(self.n_dim, 512, bias=True)
 
     def forward(self, x, sbj_idxs):
         x = x.unsqueeze(1)
@@ -239,7 +242,10 @@ class EEGNetSub(nn.Module):
         )
 
         self.n_dim = self.compute_dim(num_channels, T)
-        self.classifier = nn.Linear(self.n_dim, 512, bias=True)
+        # self.classifier = nn.Linear(self.n_dim, 512, bias=True)
+
+        out_features = 512 if not 'out_features' in args.keys() else args['out_features']
+        self.classifier = nn.Linear(self.n_dim, out_features, bias=True)
 
     def forward(self, x, sbj_idxs):
         x = x.unsqueeze(1)

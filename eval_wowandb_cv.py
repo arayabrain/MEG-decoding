@@ -138,12 +138,14 @@ def run(args: DictConfig, eval_sbj:str='1') -> None:
         )
 
     elif args.dataset == "GOD":
-        source_dataset = GODDatasetBase(args, 'train', return_label=True)
+        feature_layer = 'clip' if not 'fearure_layer' in args.keys() else args['feature_layer']
+        source_dataset = GODDatasetBase(args, 'train', return_label=True, feature_layer=feature_layer)
         outlier_dataset = GODDatasetBase(args, 'val', return_label=True,
                                          mean_X= source_dataset.mean_X,
                                          mean_Y=source_dataset.mean_Y,
                                          std_X=source_dataset.std_X,
-                                         std_Y=source_dataset.std_Y
+                                         std_Y=source_dataset.std_Y,
+                                         feature_layer=feature_layer
                                         )
         # train_size = int(np.round(len(source_dataset)*0.8))
         # val_size = len(source_dataset) - train_size
