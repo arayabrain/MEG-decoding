@@ -30,6 +30,7 @@ from meg_decoding.utils.vis_grad import get_grad
 from torch.utils.data.dataset import Subset
 import matplotlib.pyplot as plt
 import seaborn as sns
+from bdpy.stats import corrmat
 
 
 def run(args: DictConfig, eval_sbj:str='1') -> None:
@@ -138,7 +139,8 @@ def run(args: DictConfig, eval_sbj:str='1') -> None:
         )
 
     elif args.dataset == "GOD":
-        feature_layer = 'clip' if not 'fearure_layer' in args.keys() else args['feature_layer']
+        feature_layer = 'clip' if not 'feature_layer' in args.keys() else args['feature_layer']
+        # import pdb; pdb.set_trace()
         source_dataset = GODDatasetBase(args, 'train', return_label=True, feature_layer=feature_layer)
         outlier_dataset = GODDatasetBase(args, 'val', return_label=True,
                                          mean_X= source_dataset.mean_X,
@@ -294,7 +296,6 @@ def run(args: DictConfig, eval_sbj:str='1') -> None:
             Zs.append(Z)
             Ys.append(Y)
             Ls.append(Labels)
-
             loss = loss_func(Y, Z)
 
             testTop1acc, testTop10acc = classifier(Z, Y, test=True)  # ( 250, 1024, 360 )
@@ -318,10 +319,12 @@ def run(args: DictConfig, eval_sbj:str='1') -> None:
     # 仮説1:判定に偏りがある。-> あるサンプルのimageの特徴量がMEGの潜在空間ににているかどうかを判定するだけの基準になっているのではないか？
     Zs = Zs - Zs.mean(dim=0, keepdims=True)
     Zs = Zs / Zs.std(dim=0, keepdims=True)
-    Zs = Zs - Zs.mean(dim=1, keepdims=True)
-    Zs = Zs / Zs.std(dim=1, keepdims=True)
+    # Zs = Zs - Zs.mean(dim=1, keepdims=True)
+    # Zs = Zs / Zs.std(dim=1, keepdims=True)
 
-    acc, mat = evaluate(Zs, Ys)
+    acc, mat = evaluate(Zs, Ys, metric='cosin')
+    acc, mat = evaluate(Zs, Ys, metric='kamitani_corr')
+    exit()
     vis_confusion_mat(mat, acc, os.path.join(args.save_root, 'confusion_mat.png'))
     n_database_hits = mat.sum(axis=0)
     print('Num of hits of dataset \n', n_database_hits)
@@ -396,26 +399,34 @@ def boxplot_and_plot(bp_array, plot_array_label, ax):
     ax.set_xlabel('unit id')
     ax.set_ylabel('logits')
     
-def calc_similarity(x, y):
+def calc_similarity(x, y, metric='cosin'):
     batch_size = len(x)
     gt_size = len(y)
+    print('metric', metric)
+    if metric == 'kamitani_corr':
+        print('use kamitani_corr')
+        similarity = corrmat(x.cpu().numpy(), y.cpu().numpy())
+        return similarity
+    else:
 
-    similarity = torch.empty(batch_size, gt_size).to('cuda')
-    for i in range(batch_size):
-        for j in range(gt_size):
-            similarity[i, j] = (x[i] @ y[j]) / max((x[i].norm() * y[j].norm()), 1e-8)
-    return similarity.cpu().numpy()
+        similarity = torch.empty(batch_size, gt_size).to('cuda')
+        for i in range(batch_size):
+            for j in range(gt_size):
+                similarity[i, j] = (x[i] @ y[j]) / max((x[i].norm() * y[j].norm()), 1e-8)
+        return similarity.cpu().numpy()
 
-def evaluate(Z, Y):
+def evaluate(Z, Y, metric='cosin'):
     # Z: (batch_size, 512)
     # Y: (gt_size, 512)
     binary_confusion_matrix = np.zeros([len(Z), len(Y)])
-    similarity = calc_similarity(Z, Y)
+    similarity = calc_similarity(Z, Y, metric=metric)
     acc_tmp = np.zeros(len(similarity))
+    mean_similarity = []
     for i in range(len(similarity)):
         acc_tmp[i] = np.sum(similarity[i,:] < similarity[i,i]) / (len(similarity)-1)
         binary_confusion_matrix[i,similarity[i,:] < similarity[i,i]] = 1 
         binary_confusion_matrix[i,similarity[i,:] > similarity[i,i]] = -1 
+        mean_similarity.append(similarity[i,i])
     similarity_acc = np.mean(acc_tmp)
     # import pdb; pdb.set_trace() 
     top10_acc = []
@@ -428,6 +439,7 @@ def evaluate(Z, Y):
 
 
     print('Similarity Acc', similarity_acc)
+    print('Mean Similarity: ', np.mean(similarity))
     
     return similarity_acc, binary_confusion_matrix
 
@@ -444,8 +456,8 @@ def vis_confusion_mat(mat, acc, savefile=None):
 if __name__ == "__main__":
     from hydra import initialize, compose
     with initialize(version_base=None, config_path="../configs/"):
-        args = compose(config_name='20230427_sbj01_eegnet')
-        args = compose(config_name='20230429_sbj01_eegnet_regression')
+        # args = compose(config_name='20230427_sbj01_eegnet')
+        # args = compose(config_name='20230429_sbj01_eegnet_regression')
         # args = compose(config_name='20230501_all_eegnet_regression')
         # args = compose(config_name='20230425_sbj01_seq2stat')
         # args = compose(config_name='20230515_sbj02_eegnet_regression')
@@ -458,6 +470,10 @@ if __name__ == "__main__":
         # args = compose(config_name='20230601_sbj03_eegnet_regression_src_reconst')
         # args = compose(config_name='20230606_sbj02_eegnet')
         # args = compose(config_name='20230607_sbj03_eegnet')
+        # args = compose(config_name = '20230621_sbj01_eegnet_regression_cnn')
+        # args = compose(config_name = '20230623_sbj01_eegnet_regression_cnn3')
+        args = compose(config_name = '20230622_sbj01_eegnet_regression_cnn5')
+        # args = compose(config_name = '20230622_sbj01_eegnet_regression_cnn8')
     # for subset of 20230501
     # with initialize(version_base=None, config_path="../configs/subjects"):
     #     args.subjects = compose(config_name='pattern_sbj01')
@@ -465,3 +481,4 @@ if __name__ == "__main__":
     if not os.path.exists(os.path.join(args.save_root, 'weights')):
         os.makedirs(os.path.join(args.save_root, 'weights'))
     run(args, eval_sbj)
+    # run(args, eval_sbj, metric='cosin÷')

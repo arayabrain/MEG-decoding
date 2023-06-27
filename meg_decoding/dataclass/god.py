@@ -215,12 +215,12 @@ class GODDatasetBase(Dataset):
             data_feature = bdpy.BData(IMAGE_FEATURE_PATH)
             cnn_data = data_feature.select(feature_layer)
             print('get {} layer features'.format(feature_layer))
-            if split == 'train' or split == 'val':
+            if split == 'train' :#or split == 'val':
                 indices = slice(0, 1200, 1)
-            elif split=='test':
+            elif split=='val':
                 indices = slice(1200, 1250, 1)
             else:
-                raise ValueError('split should be train, val or test')
+                raise ValueError('split should be train, val')
             image_feature_epochs = cnn_data[indices, :]
             image_feature_epochs = image_feature_epochs[label_epochs-1, :]
         else:
@@ -234,6 +234,7 @@ class GODDatasetBase(Dataset):
             # image_feature_epochs = y[label_epochs-1, :]
             
             print('get clip features')
+        # import pdb; pdb.set_trace()
         return meg_epochs, sub_epochs, label_epochs, image_feature_epochs
 
     def avg_same_image_sub_epochs(self, Xs, Ys, subs, labels):
