@@ -33,7 +33,7 @@ from bdpy.stats import corrcoef
 from bdpy.util import makedir_ifnot, get_refdata
 from bdpy.dataform import append_dataframe
 from bdpy.distcomp import DistComp
-
+from bdpy.stats import corrmat
 
 
 import os
@@ -48,7 +48,10 @@ class Config():
     #             'Subject4' : ['fMRI/data/Subject4.h5'],
     #             'Subject5' : ['fMRI/data/Subject5.h5']}
     subjects = {'Subject1' : ['data/fMRI/Subject1.h5'], # top10 acc: /50 0.7 Similarity Acc 0.819 (n_units=1000, N=35)  top10 acc: /50 0.7 Similarity Acc 0.815 (n_units=1000, N=6)
-                'Subject2' : ['data/fMRI/Subject2.h5'] # top10 acc: /50 0.64 Similarity Acc 0.796 (n_units=1000, N=35) top10 acc: /50 0.58 Similarity Acc  0.749 (n_units=1000, N=6)
+                'Subject2' : ['data/fMRI/Subject2.h5'], # top10 acc: /50 0.64 Similarity Acc 0.796 (n_units=1000, N=35) top10 acc: /50 0.58 Similarity Acc  0.749 (n_units=1000, N=6)
+                'Subject3' : ['data/fMRI/Subject3.h5'], #
+                'Subject4' : ['data/fMRI/Subject4.h5'], #
+                'Subject5' : ['data/fMRI/Subject5.h5']  #
                 }
 
     rois = {'VC' : 'ROI_VC = 1'}#,
@@ -75,12 +78,12 @@ class Config():
 
     image_feature_file = 'data/fMRI/ImageFeatures.h5'
     # features = ['cnn1', 'cnn2', 'cnn3', 'cnn4', 'cnn5', 'cnn6', 'cnn7', 'cnn8', 'hmax1', 'hmax2', 'hmax3', 'gist', 'sift']
-    features = ['cnn5']
+    features = ['cnn3', 'cnn5', 'cnn8', 'clip'] # ['cnn1', 'cnn3', 'cnn5', 'cnn8', 'clip']
     use_clip = False
 
     # Results settings
-    results_dir = os.path.join('../results', analysis_name)
-    results_file = os.path.join('../results', analysis_name + '.pkl')
+    results_dir = os.path.join('./results', analysis_name)
+    results_file = os.path.join('./results', analysis_name + '.pkl')
 
     # Figure settings
     # roi_labels = ['V1', 'V2', 'V3', 'V4', 'LOC', 'FFA', 'PPA', 'LVC', 'HVC', 'VC']
@@ -139,25 +142,46 @@ def main():
         print('ROI:        %s' % roi)
         print('Num voxels: %d' % num_voxel[roi])
         print('Feature:    %s' % feat)
+        if feat == 'clip':
+            config.use_clip = True
+        else:
+            config.use_clip = False
 
         # Distributed computation
         analysis_id = analysis_basename + '-' + sbj + '-' + roi + '-' + feat
         results_file = os.path.join(results_dir, analysis_id + '.pkl')
+        # import pdb; pdb.set_trace()
 
         if os.path.exists(results_file):
             print('%s is already done. Skipped.' % analysis_id)
             with open(results_file, 'rb') as f:
                 results = pickle.load(f)
-            Zs = results['predicted_feature_averaged'][0]
-            Ys = results['true_feature_averaged'][0]
+            try :
+                Zs = results['predicted_feature_averaged'][0]
+                Ys = results['true_feature_averaged'][0]
+            except KeyError:
+                Zs = results['predicted_feature_averaged_percept'][0]
+                Ys_old = results['true_feature_averaged_percept'][0]
+                Ys = results['category_feature_averaged_percept'][0]
+            # import pdb; pdb.set_trace()
             # pred_y_pt = results['predicted_feature'][0][:300]
             # true_y_pt = results['true_feature'][0][:300]
             # test_label_pt = results['test_label'][0][:300]
             # Zs, Ys, Ls \
             #     = get_averaged_feature(pred_y_pt, true_y_pt, test_label_pt)
             print('Zs mean:', np.mean(Zs))
-            evaluate(Zs, Ys)
-            # continue
+            evaluate(Zs, Ys, metric='cosine')
+            evaluate(Zs, Ys_old, metric='cosine')
+            evaluate(Zs, Ys, metric='kamitani_corr')
+            evaluate(Zs, Ys_old, metric='kamitani_corr')
+            # simmat_pt = corrmat(Zs, Ys)
+            # # # simmat_im = corrmat(pred_im, feat_candidate_im)
+            # cr_pt = get_pwident_correctrate(simmat_pt)
+            # # # cr_im = get_pwident_correctrate(simmat_im)
+            # print(np.mean(cr_pt))
+            # # import pdb; pdb.set_trace()
+            # evaluate_kamitani(results_file, image_feature)
+            continue
 
         dist = DistComp(lockdir='tmp', comp_id=analysis_id)
         # if dist.islocked():
@@ -205,6 +229,12 @@ def main():
             y_sorted = get_refdata(y, y_label, labels)
             y_train = y_sorted[i_train, :] # 1200
             y_test = y_sorted[i_test, :] # 1750+500
+        # import pdb; pdb.set_trace()
+        # (Pdb) Ys_old.sum()
+        # # -1399621.7137963176
+        # i_pt = i_test_pt[i_test]
+        # true_y_pt = true_y[i_pt, :]
+        # ind_catave = (data_feature.select('FeatureType') == 3).flatten()
 
         # Feature prediction
         pred_y, true_y = feature_prediction(x_train, y_train,
@@ -238,10 +268,10 @@ def main():
         catlabels_set_im = np.unique(catlabels_im)                 # Category label set (imagery test)
 
         y_catlabels = data_feature.select('CatID')   # Category labels in image features
-        ind_catave = (data_feature.select('FeatureType') == 3).flatten()
+        ind_catave = (data_feature.select('FeatureType') == 3).flatten() # y_catlabels[1200:1250] == y_catlabels[1250:1300]
 
-        # y_catave_pt = get_refdata(y[ind_catave, :], y_catlabels[ind_catave, :], catlabels_set_pt)
-        # y_catave_im = get_refdata(y[ind_catave, :], y_catlabels[ind_catave, :], catlabels_set_im)
+        y_catave_pt = get_refdata(y[ind_catave, :], y_catlabels[ind_catave, :], catlabels_set_pt)
+        y_catave_im = get_refdata(y[ind_catave, :], y_catlabels[ind_catave, :], catlabels_set_im) # y[1200:1250] != y[1250:1300]
 
         # Prepare result dataframe
         results = pd.DataFrame({'subject' : [sbj, sbj],
@@ -255,7 +285,7 @@ def main():
                                 'true_feature_averaged' : [true_y_pt_av, true_y_im_av],
                                 'predicted_feature_averaged' : [pred_y_pt_av, pred_y_im_av],
                                 'category_label_set' : [catlabels_set_pt, catlabels_set_im],
-                                # 'category_feature_averaged' : [y_catave_pt, y_catave_im]
+                                'category_feature_averaged' : [y_catave_pt, y_catave_im]
                                 })
 
         # Save results
@@ -375,24 +405,37 @@ def get_averaged_feature(pred_y, true_y, labels):
 def cos_sim(v1, v2):
     return np.dot(v1, v2) / max(np.linalg.norm(v1) * np.linalg.norm(v2), 1e-8)
 
-def calc_similarity(x, y):
+def correlation(v1, v2):
+    return np.corrcoef(v1, v2)[0,1]
+
+def calc_similarity(x, y, metric='cosine'):
     batch_size = len(x)
     gt_size = len(y)
-
-    similarity = np.empty([batch_size, gt_size])
-    for i in range(batch_size):
-        for j in range(gt_size):
-            similarity[i, j] = cos_sim(x[i], y[j])
+    if metric == 'kamitani_corr':
+        print('use kamitani_corr')
+        similarity = corrmat(x, y)
+    else:
+        similarity = np.empty([batch_size, gt_size])
+        for i in range(batch_size):
+            for j in range(gt_size):
+                if metric == 'cosine':
+                    similarity[i, j] = cos_sim(x[i], y[j])
+                elif metric == 'correlation':
+                    similarity[i, j] = correlation(x[i], y[j])
     return similarity
 
-def evaluate(Z, Y):
+def evaluate(Z, Y, metric='cosine'):
     # Z: (batch_size, 512)
     # Y: (gt_size, 512)
     binary_confusion_matrix = np.zeros([len(Z), len(Y)])
-    similarity = calc_similarity(Z, Y)
+    similarity = calc_similarity(Z, Y, metric=metric)
     acc_tmp = np.zeros(len(similarity))
+    kamitani_acc_tmp = np.zeros(len(similarity))
     for i in range(len(similarity)):
         acc_tmp[i] = np.sum(similarity[i,:] < similarity[i,i]) / (len(similarity)-1)
+        kamitani_acc_tmp[i]=(len(similarity)-1 - np.sum(similarity[i,:] > similarity[i,i])) / float(len(similarity)-1)
+
+        # import pdb; pdb.set_trace()
         binary_confusion_matrix[i,similarity[i,:] < similarity[i,i]] = 1
         binary_confusion_matrix[i,similarity[i,:] > similarity[i,i]] = -1
     similarity_acc = np.mean(acc_tmp)
@@ -406,11 +449,170 @@ def evaluate(Z, Y):
     print('top10 acc: /{}'.format(Y.shape[0]), np.mean(top10_acc))
 
 
-    print('Similarity Acc', similarity_acc)
+    print('Similarity Acc', similarity_acc, np.mean(kamitani_acc_tmp))
 
     return similarity_acc, binary_confusion_matrix
 
 # Run as a scirpt ######################################################
+def evaluate_kamitani(output_file, image_feature_file):
+    # Load results -----------------------------------------------------
+    print('Loading %s' % output_file)
+
+
+    result_list = []
+    with open(output_file, 'rb') as f:
+        res = pickle.load(f)
+        result_list.append(res)
+
+    # Merge result dataframes ------------------------------------------
+    results = pd.concat(result_list, ignore_index=True)
+
+    data_feature = bdpy.BData(image_feature_file)
+    # y_catlabels = data_feature.select('CatID')   # Category labels in image features
+    # ind_catave = (data_feature.select('FeatureType') == 3).flatten()
+    # results['category_feature_averaged_x'] = get_refdata(data_feature.select(feat)[ind_catave, :], y_catlabels[ind_catave, :], results['category_label_set'][0])
+    # results['category_feature_averaged_y'] = get_refdata(data_feature.select(feat)[ind_catave, :], y_catlabels[ind_catave, :], results['category_label_set'][1])
+
+    try :
+        # Drop unnecessary columns
+        results.drop('predicted_feature', axis=1, inplace=True)
+        results.drop('true_feature', axis=1, inplace=True)
+        results.drop('test_label', axis=1, inplace=True)
+
+        # Calculated feature prediction accuracy ---------------------------
+        res_pt = results.query('test_type == "perception"')
+        res_im = results.query('test_type == "imagery"')
+
+        # Profile correlation (image)
+        res_pt['profile_correlation_image'] = [corrcoef(t, p, var='col')
+                                            for t, p in zip(res_pt['true_feature_averaged'],
+                                                            res_pt['predicted_feature_averaged'])]
+        res_pt['mean_profile_correlation_image'] = res_pt.loc[:, 'profile_correlation_image'].apply(np.nanmean)
+
+        # Profile correlation (category, seen)
+        res_pt['profile_correlation_cat_percept'] = [corrcoef(t, p, var='col')
+                                                    for t, p in zip(res_pt['category_feature_averaged'],
+                                                                    res_pt['predicted_feature_averaged'])]
+        res_pt['mean_profile_correlation_cat_percept'] = res_pt.loc[:, 'profile_correlation_cat_percept'].apply(np.nanmean)
+
+        # Profile correlation (category, imagined)
+        res_im['profile_correlation_cat_imagery'] = [corrcoef(t, p, var='col')
+                                                    for t, p in zip(res_im['category_feature_averaged'],
+                                                                    res_im['predicted_feature_averaged'])]
+        res_im['mean_profile_correlation_cat_imagery'] = res_im.loc[:, 'profile_correlation_cat_imagery'].apply(np.nanmean)
+
+        # Merge results
+        results_merged = pd.merge(res_pt, res_im, on=['subject', 'roi', 'feature'])
+
+        # Rename columns
+        results_merged = results_merged.rename(columns={'test_label_set_x' : 'test_label_set_percept',
+                                                        'test_label_set_y' : 'test_label_set_imagery',
+                                                        'true_feature_averaged_x' : 'true_feature_averaged_percept',
+                                                        'true_feature_averaged_y' : 'true_feature_averaged_imagery',
+                                                        'predicted_feature_averaged_x' : 'predicted_feature_averaged_percept',
+                                                        'predicted_feature_averaged_y' : 'predicted_feature_averaged_imagery',
+                                                        'category_label_set_x' : 'category_label_set_percept',
+                                                        'category_label_set_y' : 'category_label_set_imagery',
+                                                        'category_feature_averaged_x' : 'category_feature_averaged_percept',
+                                                        'category_feature_averaged_y' : 'category_feature_averaged_imagery'})
+
+        # Drop unnecessary columns
+        results_merged.drop('test_type_x', axis=1, inplace=True)
+        results_merged.drop('test_type_y', axis=1, inplace=True)
+        results = results_merged
+    except KeyError:
+        pass
+
+
+
+    # Category identification ------------------------------------------
+    print('Running pair-wise category identification')
+    # import pdb; pdb.set_trace()
+    feature_list = results['feature']
+    pred_percept = results['predicted_feature_averaged_percept']
+    pred_imagery = results['predicted_feature_averaged_imagery']
+    cat_label_percept = results['category_label_set_percept']
+    cat_label_imagery = results['category_label_set_imagery']
+    cat_feature_percept = results['category_feature_averaged_percept']
+    cat_feature_imagery = results['category_feature_averaged_imagery']
+
+    ind_cat_other = (data_feature.select('FeatureType') == 4).flatten()
+
+    pwident_cr_pt = []  # Prop correct in pair-wise identification (perception)
+    pwident_cr_im = []  # Prop correct in pair-wise identification (imagery)
+
+    for f, fpt, fim, pred_pt, pred_im in zip(feature_list, cat_feature_percept, cat_feature_imagery,
+                                             pred_percept, pred_imagery):
+        feat_other = data_feature.select(f)[ind_cat_other, :]
+
+        n_unit = fpt.shape[1]
+        feat_other = feat_other[:, :n_unit]
+
+        feat_candidate_pt = np.vstack([fpt, feat_other])
+        # feat_candidate_im = np.vstack([fim, feat_other])
+        feat_candidate_pt = fpt
+        # import pdb; pdb.set_trace()
+
+        simmat_pt = corrmat(pred_pt, feat_candidate_pt)
+        # simmat_im = corrmat(pred_im, feat_candidate_im)
+
+        cr_pt = get_pwident_correctrate(simmat_pt)
+        # cr_im = get_pwident_correctrate(simmat_im)
+
+        pwident_cr_pt.append(np.mean(cr_pt))
+        # pwident_cr_im.append(np.mean(cr_im))
+
+    results['catident_correct_rate_percept'] = pwident_cr_pt
+    # results['catident_correct_rate_imagery'] = pwident_cr_im
+
+    # Save the merged dataframe ----------------------------------------
+    # with open(output_file, 'wb') as f:
+    #     pickle.dump(results, f)
+    # print('Saved %s' % output_file)
+
+    # Show results -----------------------------------------------------
+    tb_pt = pd.pivot_table(results, index=['roi'], columns=['feature'],
+                           values=['catident_correct_rate_percept'], aggfunc=np.mean)
+    # tb_im = pd.pivot_table(results, index=['roi'], columns=['feature'],
+    #                        values=['catident_correct_rate_imagery'], aggfunc=np.mean)
+
+    print(tb_pt)
+    # print(tb_im)
+
+
+# Functions ############################################################
+
+def get_pwident_correctrate(simmat):
+    '''
+    Returns correct rate in pairwise identification
+
+    Parameters
+    ----------
+    simmat : numpy array [num_prediction * num_category]
+        Similarity matrix
+
+    Returns
+    -------
+    correct_rate : correct rate of pair-wise identification
+    '''
+
+    num_pred = simmat.shape[0]
+    labels = range(num_pred)
+
+    correct_rate = []
+    for i in range(num_pred):
+        pred_feat = simmat[i, :]
+        correct_feat = pred_feat[labels[i]]
+        pred_num = len(pred_feat) - 1
+        correct_rate.append((pred_num - np.sum(pred_feat > correct_feat)) / float(pred_num)) # 間違ってね？
+
+    return correct_rate
+
+
+# Run as a scirpt ######################################################
+
+
+
 
 if __name__ == '__main__':
     # To avoid any use of global variables,

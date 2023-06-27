@@ -18,9 +18,6 @@ mne.set_log_level(verbose="WARNING")
 import bdpy
 
 IMAGE_FEATURE_PATH = '/home/yainoue/meg2image/codes/MEG-decoding/data/fMRI/ImageFeatures.h5'
-CLIP_TRAIN_FEATURE_PATH = '/work/project/MEG_GOD/GOD_dataset/clip_image_training.mat'
-CLIP_TEST_FEATURE_PATH = '/work/project/MEG_GOD/GOD_dataset/clip_image_test.mat'
-
 
 def normalize_per_unit(tensor, subs, return_stats=False):
     print('normalize image_feature along unit dim')
@@ -222,18 +219,8 @@ class GODDatasetBase(Dataset):
             else:
                 raise ValueError('split should be train, val or test')
             image_feature_epochs = cnn_data[indices, :]
-            image_feature_epochs = image_feature_epochs[label_epochs-1, :]
-        else:
-            # print('DEBUG:::')
-            # import mat73
-            # if split == 'train' or split =='val':
-            #     data = mat73.loadmat(CLIP_TRAIN_FEATURE_PATH)
-            # elif split=='test':
-            #     data = mat73.loadmat(CLIP_TEST_FEATURE_PATH)
-            # y =data['vec']
-            # image_feature_epochs = y[label_epochs-1, :]
-            
-            print('get clip features')
+            image_feature_epochs = image_feature_epochs[label_epochs, :]
+            # labelが1始まりかchecK
         return meg_epochs, sub_epochs, label_epochs, image_feature_epochs
 
     def avg_same_image_sub_epochs(self, Xs, Ys, subs, labels):
