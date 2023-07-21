@@ -18,9 +18,6 @@ mne.set_log_level(verbose="WARNING")
 import bdpy
 
 IMAGE_FEATURE_PATH = '/home/yainoue/meg2image/codes/MEG-decoding/data/fMRI/ImageFeatures.h5'
-CLIP_TRAIN_FEATURE_PATH = '/work/project/MEG_GOD/GOD_dataset/clip_image_training.mat'
-CLIP_TEST_FEATURE_PATH = '/work/project/MEG_GOD/GOD_dataset/clip_image_test.mat'
-
 
 def normalize_per_unit(tensor, subs, return_stats=False):
     print('normalize image_feature along unit dim')
@@ -48,7 +45,7 @@ def normalize_per_unit(tensor, subs, return_stats=False):
 
 class GODDatasetBase(Dataset):
     def __init__(self, args, split, preprocess_pipleine:list=[], return_label:bool=False,
-                 mean_X=None, mean_Y=None, std_X=None, std_Y=None, feature_layer='clip'):
+                 mean_X=None, mean_Y=None, std_X=None, std_Y=None, feature_layer='clip',avg=False):
         self.args = args
         self.sub_id_map = {s:i for i, s in enumerate(list(self.args.subjects.keys()))}
         self.preprocess_pipeline = preprocess_pipleine
@@ -90,7 +87,7 @@ class GODDatasetBase(Dataset):
         self.subs = sub_epochs # epochs (x 1)
         self.labels = label_epochs # epochs (x 1)
 
-        if split == 'val':
+        if split == 'val' or avg:
             self.X, self.Y, self.subs, self.labels = self.avg_same_image_sub_epochs(self.X, self.Y, self.subs, self.labels)
 
         self.labels = self.labels.astype(np.int16)

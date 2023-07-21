@@ -149,12 +149,20 @@ def run(args: DictConfig, eval_sbj:str='1') -> None:
                                          std_Y=source_dataset.std_Y,
                                          feature_layer=feature_layer
                                         )
+        ref_dataset = GODDatasetBase(args, 'train', return_label=True,
+                                         mean_X= source_dataset.mean_X,
+                                         mean_Y=source_dataset.mean_Y,
+                                         std_X=source_dataset.std_X,
+                                         std_Y=source_dataset.std_Y,
+                                         feature_layer=feature_layer,
+                                         avg=True
+                                        )
         # train_size = int(np.round(len(source_dataset)*0.8))
         # val_size = len(source_dataset) - train_size
 
         # train_dataset, val_dataset = torch.utils.data.random_split(source_dataset, [train_size, val_size])
         if eval_sbj == '1':
-            ind_tr = list(range(100))# list(range(0, 3000)) + list(range(3600, 6600)) #+ list(range(7200, 21600)) # + list(range(7200, 13200)) + list(range(14400, 20400))
+            ind_tr = list(range(3000))# list(range(0, 3000)) + list(range(3600, 6600)) #+ list(range(7200, 21600)) # + list(range(7200, 13200)) + list(range(14400, 20400))
             ind_te = list(range(3000,3600)) + list(range(6600, 7200)) # + list(range(13200, 14400)) + list(range(20400, 21600))
             ind_out = list(range(0,50))
         elif eval_sbj == '2':
@@ -173,7 +181,7 @@ def run(args: DictConfig, eval_sbj:str='1') -> None:
         train_dataset = Subset(source_dataset, ind_tr)
         val_dataset   = Subset(source_dataset, ind_te)
 
-
+        # import pdb; pdb.set_trace()
         with open_dict(args):
             args.num_subjects = source_dataset.num_subjects
             print('num subject is {}'.format(args.num_subjects))
@@ -190,7 +198,9 @@ def run(args: DictConfig, eval_sbj:str='1') -> None:
 
         else:
             train_loader = DataLoader(
-                train_dataset,
+                # train_dataset,
+                val_dataset,
+                # ref_dataset,
                 batch_size= args.batch_size,
                 drop_last=True,
                 shuffle=False,
@@ -255,6 +265,8 @@ def run(args: DictConfig, eval_sbj:str='1') -> None:
     trainTop10accs = []
     testTop1accs = []
     testTop10accs = []
+    train_Zs = []
+    train_Ys = []
     brain_encoder.eval()
     pbar2 = tqdm(train_loader)
     for i, batch in enumerate(pbar2):
@@ -269,13 +281,23 @@ def run(args: DictConfig, eval_sbj:str='1') -> None:
             X, Y = X.to(device), Y.to(device)
             # import pdb; pdb.set_trace()
             Z = brain_encoder(X, subject_idxs)
+            train_Zs.append(Z)
+            train_Ys.append(Y)
             loss = loss_func(Y, Z)
             with torch.no_grad():
                 trainTop1acc, trainTop10acc = classifier(Z, Y)
             train_losses.append(loss.item())
             trainTop1accs.append(trainTop1acc)
             trainTop10accs.append(trainTop10acc)
-
+    train_Zs = torch.cat(train_Zs, dim=0)
+    train_Ys = torch.cat(train_Ys, dim=0)
+    train_Zs = train_Zs - train_Zs.mean(dim=0, keepdims=True)
+    train_Zs = train_Zs / train_Zs.std(dim=0, keepdims=True)
+    corr_list_train = []
+    for z, y in zip(train_Zs.T, train_Ys.T):
+        corr_list_train.append(np.corrcoef(z.cpu().numpy(),y.cpu().numpy())[0,1])
+    
+    
     Zs = []
     Ys = []
     Ls = []
@@ -324,6 +346,37 @@ def run(args: DictConfig, eval_sbj:str='1') -> None:
 
     acc, mat = evaluate(Zs, Ys, metric='cosin')
     acc, mat = evaluate(Zs, Ys, metric='kamitani_corr')
+    # import pdb; pdb.set_trace()
+    fig, axes = plt.subplots(ncols=2, figsize=(10,5))
+    corr_list = []
+    for z, y in zip(Zs.T, Ys.T):
+        corr_list.append(np.corrcoef(z.cpu().numpy(),y.cpu().numpy())[0,1])
+    axes[0].plot(np.arange(len(corr_list)), corr_list)
+    axes[0].set_xlabel('dim')
+    axes[0].set_ylabel('corr')
+    corr_list2 = []
+    for z, y in zip(Zs, Ys):
+        corr_list2.append(np.corrcoef(z.cpu().numpy(),y.cpu().numpy())[0,1])
+    axes[1].plot(np.arange(len(corr_list2)), corr_list2)
+    axes[1].set_xlabel('image')
+    axes[1].set_ylabel('corr')
+    savefile = os.path.join(args.save_root, 'corr_per_dim_image.png')
+    plt.savefig(savefile)
+    print('corr is save to ', savefile)
+    import pickle
+    pickle.dump({'corr_dim': corr_list, 'corr_image': corr_list2}, 
+                open(savefile.replace('.png', '.pkl'), 'wb'))
+    # import pdb; pdb.set_trace()
+    important_dims_test = np.where([c > 0.4 for c in corr_list])
+    print('test pick.  leak')
+    acc, mat = evaluate(Zs[:,important_dims_test[0]], Ys[:,important_dims_test[0]], metric='kamitani_corr')
+    print('train pick')
+    
+    important_dims_train = np.where([c > 0. for c in corr_list_train])
+    acc, mat = evaluate(Zs[:,important_dims_train[0]], Ys[:,important_dims_train[0]], metric='kamitani_corr')
+    # import pdb; pdb.set_trace()
+
+
     exit()
     vis_confusion_mat(mat, acc, os.path.join(args.save_root, 'confusion_mat.png'))
     n_database_hits = mat.sum(axis=0)
@@ -406,6 +459,7 @@ def calc_similarity(x, y, metric='cosin'):
     if metric == 'kamitani_corr':
         print('use kamitani_corr')
         similarity = corrmat(x.cpu().numpy(), y.cpu().numpy())
+        # import pdb; pdb.set_trace()
         return similarity
     else:
 
@@ -439,7 +493,7 @@ def evaluate(Z, Y, metric='cosin'):
 
 
     print('Similarity Acc', similarity_acc)
-    print('Mean Similarity: ', np.mean(similarity))
+    print('Mean Similarity: ', np.mean(mean_similarity))
     
     return similarity_acc, binary_confusion_matrix
 
@@ -457,7 +511,7 @@ if __name__ == "__main__":
     from hydra import initialize, compose
     with initialize(version_base=None, config_path="../configs/"):
         # args = compose(config_name='20230427_sbj01_eegnet')
-        # args = compose(config_name='20230429_sbj01_eegnet_regression')
+        args = compose(config_name='20230429_sbj01_eegnet_regression')
         # args = compose(config_name='20230501_all_eegnet_regression')
         # args = compose(config_name='20230425_sbj01_seq2stat')
         # args = compose(config_name='20230515_sbj02_eegnet_regression')
@@ -472,8 +526,22 @@ if __name__ == "__main__":
         # args = compose(config_name='20230607_sbj03_eegnet')
         # args = compose(config_name = '20230621_sbj01_eegnet_regression_cnn')
         # args = compose(config_name = '20230623_sbj01_eegnet_regression_cnn3')
-        args = compose(config_name = '20230622_sbj01_eegnet_regression_cnn5')
+        # args = compose(config_name = '20230622_sbj01_eegnet_regression_cnn5')
         # args = compose(config_name = '20230622_sbj01_eegnet_regression_cnn8')
+        # args = compose(config_name = '20230710_sbj01_eegnet_regression_cnn5')
+        # args = compose(config_name = '20230622_sbj01_eegnet_regression_cnn8')
+        # args = compose(config_name = '20230628_sbj03_eegnet_regression_cnn1')
+        # args = compose(config_name = '20230629_sbj03_eegnet_regression_cnn3')
+        # args = compose(config_name = '20230630_sbj03_eegnet_regression_cnn5')
+        # args = compose(config_name = '20230702_sbj03_eegnet_regression_cnn8')
+
+        # args = compose(config_name = '20230710_sbj01_eegnet_regression_cnn5_lowpass')
+        args = compose(config_name = '20230710_sbj01_eegnet_regression_cnn5')
+
+        # args = compose(config_name = '20230712_sbj01_eegnet_regression_clip_200')
+        # args = compose(config_name = '20230712_sbj01_eegnet_regression_clip_broad')
+        # args = compose(config_name = '20230712_sbj01_eegnet_regression_clip')
+        args = compose(config_name = '20230712_sbj01_eegnet_regression_cnn5_broad')
     # for subset of 20230501
     # with initialize(version_base=None, config_path="../configs/subjects"):
     #     args.subjects = compose(config_name='pattern_sbj01')

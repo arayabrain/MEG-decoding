@@ -261,6 +261,7 @@ def run(args: DictConfig) -> None:
             X, Y = X.to(device), Y.to(device)
             # import pdb; pdb.set_trace()
             Z = brain_encoder(X, subject_idxs)
+            # import pdb; pdb.set_trace()
             loss = loss_func(Y, Z)
             with torch.no_grad():
                 trainTop1acc, trainTop10acc = classifier(Z, Y)
@@ -362,7 +363,7 @@ def run(args: DictConfig) -> None:
 if __name__ == "__main__":
     from hydra import initialize, compose
     with initialize(version_base=None, config_path="../configs/"):
-        args = compose(config_name='20230623_sbj01_eegnet_regression_cnn3.yaml')
+        args = compose(config_name='20230712_sbj01_eegnet_regression_cnn5_broad')
     if not os.path.exists(os.path.join(args.save_root, 'weights')):
         os.makedirs(os.path.join(args.save_root, 'weights'))
     run(args)

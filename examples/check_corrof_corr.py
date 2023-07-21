@@ -37,10 +37,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import mne
 import pandas as pd
+import bdpy
 
 
-
-def prepare_dataset(args, split, manual_ch=None, onsets:dict=None):
+def prepare_dataset(args, split, manual_ch=None, onsets:dict=None, feature_layer:str='clip'):
     DATAROOT = args.data_root
     processed_meg_path_pattern = os.path.join(DATAROOT, '{sub}/mat/{name}')
     label_path_pattern = os.path.join(DATAROOT, '{sub}/labels/{name}')
@@ -119,6 +119,31 @@ def prepare_dataset(args, split, manual_ch=None, onsets:dict=None):
     label_epochs = np.concatenate(label_epochs, axis=0)
     image_feature_epochs = np.concatenate(image_feature_epochs, axis=0)
     print('dataset is created. size is ', meg_epochs.shape)
+    # import pdb; pdb.set_trace()
+    if feature_layer != 'clip':
+        IMAGE_FEATURE_PATH = '/home/yainoue/meg2image/codes/MEG-decoding/data/fMRI/ImageFeatures.h5'
+        data_feature = bdpy.BData(IMAGE_FEATURE_PATH)
+        cnn_data = data_feature.select(feature_layer)
+        print('get {} layer features'.format(feature_layer))
+        if split == 'train' :#or split == 'val':
+            indices = slice(0, 1200, 1)
+        elif split=='val':
+            indices = slice(1200, 1250, 1)
+        else:
+            raise ValueError('split should be train, val')
+        image_feature_epochs = cnn_data[indices, :]
+        image_feature_epochs = image_feature_epochs[label_epochs-1, :]
+    else:
+        # print('DEBUG:::')
+        # import mat73
+        # if split == 'train' or split =='val':
+        #     data = mat73.loadmat(CLIP_TRAIN_FEATURE_PATH)
+        # elif split=='test':
+        #     data = mat73.loadmat(CLIP_TEST_FEATURE_PATH)
+        # y =data['vec']
+        # image_feature_epochs = y[label_epochs-1, :]
+        
+        print('get clip features')
     return meg_epochs, sub_epochs, label_epochs, image_feature_epochs
 
 
@@ -169,6 +194,7 @@ def calc_corr_of_corr(meg_data:np.ndarray, image_data:np.ndarray, savedir:str)->
     plt.savefig(os.path.join(savedir, 'meg_image_scatter.png'))
     print('save to ', os.path.join(savedir, 'meg_image_scatter.png'))
     plt.close()
+    return meg_image_corr_corr
 
 def vis_corr(corr, savefile=None):
     sns.heatmap(corr, square=True, annot=False)
@@ -200,7 +226,8 @@ def run_normalize_trial(X, Y, saveroot, subdir):
     X = X / X.std(axis=0, keepdims=True)
     Y = Y - Y.mean(axis=0, keepdims=True)
     Y = Y / Y.std(axis=0, keepdims=True)
-    calc_corr_of_corr(X, Y, savedir)
+    meg_image_corr_corr = calc_corr_of_corr(X, Y, savedir)
+    return meg_image_corr_corr
 
 def run_SCP(X, Y, saveroot, subdir):
     # SCPを計算してcorrを計算
@@ -214,12 +241,12 @@ def run_SCP(X, Y, saveroot, subdir):
     Y = Y / Y.std(axis=0, keepdims=True)
     calc_corr_of_corr(X, Y, savedir)
 
-def run(args, ch_ratios=1, manual_ch:list=None, onsets:dict=None, saveroot:str='/home/yainoue/meg2image/results/20230427_corr_corr_resample120'):
+def run(args, ch_ratios=1, manual_ch:list=None, onsets:dict=None, saveroot:str='/home/yainoue/meg2image/results/20230427_corr_corr_resample120',feature_layer:str='clip'):
     prefix='sbj01'
     random.seed(0)
     ## prepare dataset
-    train_X, train_subs, train_label, train_Y = prepare_dataset(args, split='train', manual_ch=manual_ch, onsets=onsets)
-    test_X, test_subs, test_label, test_Y = prepare_dataset(args, split='val', manual_ch=manual_ch, onsets=onsets)
+    train_X, train_subs, train_label, train_Y = prepare_dataset(args, split='train', manual_ch=manual_ch, onsets=onsets, feature_layer=feature_layer)
+    test_X, test_subs, test_label, test_Y = prepare_dataset(args, split='val', manual_ch=manual_ch, onsets=onsets, feature_layer=feature_layer)
     # import pdb; pdb.set_trace()
 
     same_image_indices = sum([[i, i+1200, i+2400] for i in range(1200)], [])
@@ -232,7 +259,7 @@ def run(args, ch_ratios=1, manual_ch:list=None, onsets:dict=None, saveroot:str='
     # run_original(s1_d1_train_X, s1_d1_train_Y, saveroot, 's1d1') # # 0.00644 # 0.02039 #  0.00442 (8-13Hz) # 0.0193 (2-8Hz) # 0.0113 (20-40) # 0.011(30-40) # 0.116(40-60) # 0.012
     # run_original(s1_d2_train_X, s1_d2_train_Y, saveroot, 's1d2') # # 0.00432 # 0.007867 # 0.00567 #  0.0067 # 0.0106 # 0.010 # 0.011 # 0.0118
 
-    run_normalize_trial(s1_d1_train_X, s1_d1_train_Y, saveroot, 's1d1_norm_unit') # 0.01078 # 0.01068 # 0.03266 (2-13 Hz) #  0.0160 # 0.032 # 0.021 # 0.21(30-40) # 0.023 # 0.024(30-60) # 0.0265(30-70) # 0.028(60-70) # 0.043(60-100) # 0.046
+    meg_image_corr_corr = run_normalize_trial(s1_d1_train_X, s1_d1_train_Y, saveroot, 's1d1_norm_unit') # 0.01078 # 0.01068 # 0.03266 (2-13 Hz) #  0.0160 # 0.032 # 0.021 # 0.21(30-40) # 0.023 # 0.024(30-60) # 0.0265(30-70) # 0.028(60-70) # 0.043(60-100) # 0.046
     # run_normalize_trial(s1_d2_train_X, s1_d2_train_Y, saveroot, 's1d2_norm_unit') #  0.00818 # 0.00799 # 0.025034 #  0.0160 # 0.023 # 0.021 # 0.23 # 0.025 # 0.026 # 0.028 # 0.03 (60-70) # 0.0466 # 0.0490(60-120)
  
     # run_SCP(s1_d1_train_X, s1_d1_train_Y, saveroot, 's1d1_scp') #  0.008361 # 0.008417 # 0.0226 # 0.00987 # 0.022 # 0.00779 # 0.008 # 0.009
@@ -242,11 +269,20 @@ def run(args, ch_ratios=1, manual_ch:list=None, onsets:dict=None, saveroot:str='
     ## preprocess
     train_X = np.mean(train_X, axis=-1) # get SCP
     test_X = np.mean(test_X, axis=-1)
+    return meg_image_corr_corr
 
 
-@hydra.main(version_base=None, config_path="../../configs", config_name="20230421_sbj01_kamitani_regression.yaml")
+@hydra.main(version_base=None, config_path="../../configs", config_name="20230710_sbj01_kamitani_regression.yaml")
 def main(args):
-    run(args)
+    feature_layer = 'cnn5' # 'cnn5'
+    # run(args, feature_layer=feature_layer)
+    bandpass_list = [(2,5), (5,12), (2,12), (12, 30), (30, 40), (60, 80), (2, 120)]
+    ret_dict = []
+    for bandpass in bandpass_list:
+        args.preprocs.brain_filter = bandpass
+        coc1  = run(args, feature_layer=feature_layer)
+        ret_dict.append({'bandpass':bandpass, 'coc1': coc1})
+    print(ret_dict)
 
 
 

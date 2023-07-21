@@ -1,12 +1,8 @@
-import sys
-from turtle import forward
+
 import numpy as np
 import torch
 import torch.nn as nn
-from time import time
 import torch.nn.functional as F
-from termcolor import cprint
-from einops import rearrange
 from tqdm import tqdm
 from meg_decoding.matlab_utils.load_meg import roi
 
@@ -126,7 +122,9 @@ class EEGNetCogitat(nn.Module):
 class EEGNet(nn.Module):
     def __init__(self, args):
         super(EEGNet, self).__init__()
-        T = int((args.window.end - args.window.start) * args.preprocs.brain_resample_rate)
+        # 0.2-0.4は24だが0.35-0.15は23.9999
+        # T = int((args.window.end - args.window.start) * args.preprocs.brain_resample_rate)
+        T = int(np.round((args.window.end - args.window.start) * args.preprocs.brain_resample_rate))
         # DownSampling
         # self.down1 = nn.Sequential(nn.AvgPool2d((1, p0)))
 
