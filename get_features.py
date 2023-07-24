@@ -59,12 +59,15 @@ def run(args: DictConfig, eval_sbj:str='1') -> None:
     # -----------------------
     #       Dataloader
     # -----------------------
-    source_dataset = GODDatasetBase(args, 'train', return_label=True)
+    feature_layer = 'clip' if not 'feature_layer' in args.keys() else args['feature_layer']
+    # source_dataset = GODDatasetBase(args, 'train', feature_layer=feature_layer)
+    source_dataset = GODDatasetBase(args, 'train', return_label=True, feature_layer=feature_layer)
     outlier_dataset = GODDatasetBase(args, 'val', return_label=True,
                                         mean_X= source_dataset.mean_X,
                                         mean_Y=source_dataset.mean_Y,
                                         std_X=source_dataset.std_X,
-                                        std_Y=source_dataset.std_Y
+                                        std_Y=source_dataset.std_Y,
+                                        feature_layer=feature_layer
                                     )
 
     if eval_sbj == '1':
@@ -275,7 +278,7 @@ if __name__ == "__main__":
         args = compose(config_name='20230429_sbj01_eegnet_regression')
         # args = compose(config_name='20230501_all_eegnet_regression')
         # args = compose(config_name='20230425_sbj01_seq2stat')
-        # args = compose(config_name='20230515_sbj02_eegnet_regression')
+        args = compose(config_name='20230515_sbj02_eegnet_regression')
         # args = compose(config_name='20230516_sbj03_eegnet_regression')
         # args = compose(config_name='20230519_all_eegnet_regression_src_reconst')
         # args = compose(config_name='20230518_all_eegnet_regression')
@@ -285,6 +288,14 @@ if __name__ == "__main__":
         # args = compose(config_name='20230601_sbj03_eegnet_regression_src_reconst')
         # args = compose(config_name='20230606_sbj02_eegnet')
         # args = compose(config_name='20230607_sbj03_eegnet')
+        args = compose(config_name = '20230621_sbj01_eegnet_regression_cnn')
+        args = compose(config_name = '20230623_sbj01_eegnet_regression_cnn3')
+        args = compose(config_name = '20230622_sbj01_eegnet_regression_cnn5')
+        args = compose(config_name = '20230622_sbj01_eegnet_regression_cnn8')
+        args = compose(config_name = '20230628_sbj03_eegnet_regression_cnn1')
+        args = compose(config_name = '20230629_sbj03_eegnet_regression_cnn3')
+        args = compose(config_name = '20230630_sbj03_eegnet_regression_cnn5')
+        args = compose(config_name = '20230702_sbj03_eegnet_regression_cnn8')
     # for subset of 20230501
     # with initialize(version_base=None, config_path="../configs/subjects"):
     #     args.subjects = compose(config_name='pattern_sbj01')

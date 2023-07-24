@@ -518,7 +518,7 @@ if __name__ == "__main__":
         # args = compose(config_name='20230516_sbj03_eegnet_regression')
         # args = compose(config_name='20230519_all_eegnet_regression_src_reconst')
         # args = compose(config_name='20230518_all_eegnet_regression')
-        # args = compose(config_name='20230523_sbj01_eegnet_regression_src_reconst')
+        args = compose(config_name='20230523_sbj01_eegnet_regression_src_reconst')
         # args = compose(config_name='20230524_all_eegnet_regression_src_reconst')
         # args = compose(config_name='20230531_sbj02_eegnet_regression_src_reconst')
         # args = compose(config_name='20230601_sbj03_eegnet_regression_src_reconst')
@@ -536,12 +536,12 @@ if __name__ == "__main__":
         # args = compose(config_name = '20230702_sbj03_eegnet_regression_cnn8')
 
         # args = compose(config_name = '20230710_sbj01_eegnet_regression_cnn5_lowpass')
-        args = compose(config_name = '20230710_sbj01_eegnet_regression_cnn5')
+        # args = compose(config_name = '20230710_sbj01_eegnet_regression_cnn5')
 
         # args = compose(config_name = '20230712_sbj01_eegnet_regression_clip_200')
         # args = compose(config_name = '20230712_sbj01_eegnet_regression_clip_broad')
         # args = compose(config_name = '20230712_sbj01_eegnet_regression_clip')
-        args = compose(config_name = '20230712_sbj01_eegnet_regression_cnn5_broad')
+        # args = compose(config_name = '20230712_sbj01_eegnet_regression_cnn5_broad')
     # for subset of 20230501
     # with initialize(version_base=None, config_path="../configs/subjects"):
     #     args.subjects = compose(config_name='pattern_sbj01')

@@ -219,6 +219,10 @@ class GODDatasetBase(Dataset):
             else:
                 raise ValueError('split should be train, val')
             image_feature_epochs = cnn_data[indices, :]
+            # np.save(os.path.join('/home/yainoue/meg2image/results/20230721_intrinsic_dimension/image_features',
+            #                      feature_layer, f'{split}.npy'), image_feature_epochs)
+            # import pdb; pdb.set_trace()
+
             image_feature_epochs = image_feature_epochs[label_epochs-1, :]
         else:
             # print('DEBUG:::')
@@ -229,6 +233,10 @@ class GODDatasetBase(Dataset):
             #     data = mat73.loadmat(CLIP_TEST_FEATURE_PATH)
             # y =data['vec']
             # image_feature_epochs = y[label_epochs-1, :]
+            # np.save(os.path.join('/home/yainoue/meg2image/results/20230721_intrinsic_dimension/image_features',
+            #                      feature_layer, f'{split}.npy'), image_feature_epochs)
+            # import pdb; pdb.set_trace()
+
             
             print('get clip features')
         # import pdb; pdb.set_trace()
@@ -262,6 +270,7 @@ def get_kernel_block_ids(args):
         filepath = args.bdata_path.format(block_id=str(i).zfill(2))
         # print('roi block path: ', filepath)
         roi = scipy.io.loadmat(filepath)
+        import pdb; pdb.set_trace()
         target_roi_indices.append(roi['vertex_ds'][:,0])
     target_roi_indices = np.concatenate(target_roi_indices, axis=0) - 1 # 0始まりなので
     print('target_roi_indices', target_roi_indices.shape)
