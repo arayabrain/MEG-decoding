@@ -32,7 +32,7 @@ def get_baseline(meg_filepath, fs, duration):
 
 
 def get_meg_data(meg_filepath:str, label_filepath:str, trigger_filepath:str,
-                 rest_mean:np.ndarray=None, rest_std:np.ndarray=None, split='train'):
+                 rest_mean:np.ndarray=None, rest_std:np.ndarray=None, split='train', only_meg=False):
     """
     Args:
         meg_filepath(str): preprocessed MEG data path
@@ -68,6 +68,8 @@ def get_meg_data(meg_filepath:str, label_filepath:str, trigger_filepath:str,
     # assert Event_Data[1][0][0] == 'visual', '{}'.format(Event_Data[0][1][0][0])
     # onset_timing = Event_Data[1][3][0] # trial
     # assert len(onset_timing) == 600 # GOD is 600
+    if only_meg:
+        return MEG_Data
 
     Label_Data = scipy.io.loadmat(label_filepath)
     """
