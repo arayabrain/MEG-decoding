@@ -49,6 +49,9 @@ You will need `S01.mat` to `S49.mat` placed under `data/Brennan2018/raw/` and `a
 ## MEG-Movie (yanagisawa-lab)
 ### video name
 動画は10タイトルで、各タイトル複数パートに分割して提示した(40 sessions)。その際分割された動画の長さは15分以内に収まるようになっている。
+- その他，ビデオに関するメモ
+  ID10_GhostInTheShellVol1-1だけビデオが25fpsで，その他のビデオは29.97fpsである．
+  エンコードパラメータはすべて，映像: 6.2Mbps; 音声: 48kHz，224kbps で統一している  29.9
 
 ```
 ID01_HerosVol1-1_id1_MEG_DATAPixx_part1.mp4         ID05_SuitsVol1-1_id5_MEG_DATAPixx_part6.mp4
@@ -72,11 +75,19 @@ ID05_SuitsVol1-1_id5_MEG_DATAPixx_part3.mp4         ID09_BreakingBadVol1-1_id9_M
 ID05_SuitsVol1-1_id5_MEG_DATAPixx_part4.mp4         ID10_GhostInTheShellVol1-1_id10_MEG_DATAPixx_part1.mp4
 ID05_SuitsVol1-1_id5_MEG_DATAPixx_part5.mp4         ID10_GhostInTheShellVol1-1_id10_MEG_DATAPixx_part2.mp4
 ```
+### データ注意事項
+1. **sbj01**
+    * videoID=10, partID=1,2に対応するMEGデータには、ディジタルトリガーが入っていないため、光トリガーで代用する。
+
+2. **others**
 
 ### 仕様
 * **MEG-only mode**
-    * 各Sessionごとに、事前に前処理を行う
-    train/valにデータを分割。その際、各動画のセクション単位で分割する(10sec x 40)。
+    * 各Sessionごとに、事前にMEGの前処理を行う
+    * MEGデータ（.con）と動画データ(.mp4)から動画のフレーム提示を指示するtriggerを取り出す。このトリガーは仕様上動画2frameごとに一回立ち上がる。
+        * .conファイルのパースはMATLABでしかできないためこのリポジトリには含まれていない。
+    * 各sessionをセグメント（60sec）に分割する
+    * train/valにセグメントを分割。
     * 間隔TごとにMEGデータを分割
 * **MEG-Drama pair mode**
 
