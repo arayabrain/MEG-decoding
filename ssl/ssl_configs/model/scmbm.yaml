@@ -1,0 +1,14 @@
+name: sc_mbm
+parameters:
+  - datalen: null # depends on preprocess
+  - patch_size: 4
+  - embed_dim: 1024 #
+  - decoder_embed_dim: 512 #
+  - depth: 24
+  - num_heads: 16
+  - decoder_num_heads: 16
+  - mlp_ratio: 1.0
+  - focus_range: null
+  - focus_rate: 0.6
+  - img_recon_weight: 0.5
+  - use_nature_img_loss: False

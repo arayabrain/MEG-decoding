@@ -1,0 +1,15 @@
+# =====Path settings======
+kernel_root:  /work/project/MEG_GOD/GOD_dataset/VideoWatching/kernel/
+ch_region_path: './data/GOD/ch_region.json'
+montage_path: './data/GOD/montage.csv'
+bdata_path: '/work/project/MEG_GOD/hyang/BData/ROI/hcp44_{block_id}.mat'
+# ======Spatial Region settings======
+roi_block_ids: null # [1, 2, 3, 4, 5, 24, 25, 26, 27, 28] # ROI (HCP atlas): V1 + early visual + ventral stream + MT+ complex and neighboring
+region:
+  - occipital/left
+  - occipital/right
+# ======Fs settings======
+meg_fs: 1000
+
+section_length: 1.0 # [sec]
+movie_trigger_label: 3
