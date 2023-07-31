@@ -10,6 +10,7 @@ import wandb
 # get dataset
 def get_dataset(cfg:OmegaConf):
     dataset_names:dict = cfg.dataset
+    import pdb; pdb.set_trace()
     dataset_yamls:dict = cfg.dataset_yaml
     num_trial_limit:dict = cfg.total_limit
     preproc_config:OmegaConf = cfg.preprocess
@@ -49,7 +50,7 @@ def run(cfg:OmegaConf, wandb_key_path:str, device_counts:int):
     print(OmegaConf.to_yaml(cfg))
     print('=============================== END ================================')
     # dataset
-    train_dataset, val_dataset = parse_dataset(cfg)
+    train_dataset, val_dataset = get_dataset(cfg)
 
     # model
     model, trainer = get_model_and_trainer(cfg, usewandb, device_counts)
@@ -75,8 +76,8 @@ def parse_args():
 
 if __name__ == '__main__':
     args = parse_args()
-    initialize(config_path='meg_ssl/ssl_configs/')
-    cfg = compose(args.config)
+    with initialize(config_path='meg_ssl/ssl_configs/'):
+        cfg = compose(args.config)
     cfg.resume_path = args.resume
 
     run(cfg, args.wandbkey, args.device_counts)
