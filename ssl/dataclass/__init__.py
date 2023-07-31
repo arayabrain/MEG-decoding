@@ -20,6 +20,7 @@ def parse_dataset(dataset_names:dict, dataset_yamls:dict, preproc_config:OmegaCo
         num_trial_limits (dict): {'train':{'drama':12000}, 'val':{'god': 1200}}
     """
     split_datasets = {}
+    initialize(config_path="./ssl/ssl_configs/dataset")
     for split, name_dict in dataset_names.items():
         dataset_info_list = []
         dataset_config_list = []
@@ -28,10 +29,8 @@ def parse_dataset(dataset_names:dict, dataset_yamls:dict, preproc_config:OmegaCo
             h5_dir = os.path.join(h5_root, name)
             os.makedirs(h5_dir, exist_ok=True)
             if name == 'drama':
-                initialize(config_path="./ssl/ssl_configs/dataset/drama")
                 tmp_dataset_info_list = get_drama_dataset_info(session_info, h5_dir)
             elif name == 'god':
-                initialize(config_path="./ssl/ssl_configs/dataset/god")
                 tmp_dataset_info_list = get_god_dataset_info(session_info, h5_dir)
             else:
                 raise ValueError('name {} is not supported'.format(name))
@@ -41,7 +40,7 @@ def parse_dataset(dataset_names:dict, dataset_yamls:dict, preproc_config:OmegaCo
 
             dataset_info_list += tmp_dataset_info_list
             dataset_config_list += [cfg] * len(dataset_info_list)
-            num_trial_limits += [num_trial_limits_dict[split][name]] * len(dataset_info_list)
+            num_trial_limits += [int(num_trial_limits_dict[split][name]/len(dataset_info_list))] * len(dataset_info_list)
 
         split_datasets[name] = collect_session_dataset(dataset_info_list, dataset_config_list, preproc_config,
                     num_trial_limits, image_preprocs, meg_preprocs, only_meg, on_memory)
