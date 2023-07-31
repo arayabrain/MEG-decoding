@@ -4,7 +4,7 @@ defaults:
 # ========prerpocessing========
     - preprocess:  base
 # ========dataset========
-dataset:
+dataset_name:
     train:
         drama: sbj_1-session_all
     val:
