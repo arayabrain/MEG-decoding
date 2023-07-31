@@ -5,18 +5,18 @@ defaults:
     - preprocess:  base
 # ========dataset========
 dataset:
-    - train:
-        - drama: sbj_1-session_all
-    - val:
-        - god: sbj_1-train-session_6_12
+    train:
+        drama: sbj_1-session_all
+    val:
+        god: sbj_1-train-session_6_12
 dataset_yaml:
-    - drama: drama/drama_vc.yaml # drama_config.yaml # region 160 ch
-    - god: god/god_vc.yaml # god_config.yaml
+    drama: drama/drama_vc.yaml # drama_config.yaml # region 160 ch
+    god: god/god_vc.yaml # god_config.yaml
 total_limit:
-    - train:
-        - drama: 1000 # total number of samples across sessions
-    - val:
-        - god: 1200 # total number of samples across sessions
+    train:
+        drama: 1000 # total number of samples across sessions
+    val:
+        god: 1200 # total number of samples across sessions
 
 # ========path========
 logdir: '../../results_ssl/test/log'
