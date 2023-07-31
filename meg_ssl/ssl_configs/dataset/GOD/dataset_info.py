@@ -7,6 +7,7 @@ label_path_pattern = os.path.join(DATAROOT, '{sub}/labels/{session_name}')
 trigger_meg_path_pattern = os.path.join(DATAROOT, '{sub}/trigger/{session_name}')
 processed_rest_meg_path_pattern = os.path.join(DATAROOT, '{sub}/mat/{session_name}')
 image_root = '/storage/dataset/ECoG/internal/GODv2-4/'
+image_id_path_pattern = os.path.join(DATAROOT, 'clip_image_{split_relate}.mat')
 
 def get_dataset_info(name:str, h5_dir:str):
     """_summary_
@@ -43,9 +44,11 @@ def dataset_path(sbj, split, id, h5_dir):
     if split == 'train':
         image_dir = os.path.join(image_root, 'images_trn')
         session_name = 'data_block{}'.format(str(id).zfill(3))
+        split_relate = 'training'
     elif split == 'val':
         image_dir = os.path.join(image_root, 'images_val')
         session_name = 'data_val{}'.format(str(id).zfill(3))
+        split_relate = 'test'
     else:
         raise ValueError('split must be train or val')
 
@@ -57,5 +60,6 @@ def dataset_path(sbj, split, id, h5_dir):
         'meg_rest_path': processed_rest_meg_path_pattern.format(sub=sbj, session_name=session_name),
         'sbj_name': sbj,
         'h5_file_name': os.path.join(h5_dir, '{}_{}.h5'.format(sbj, session_name)),
+        'image_id_path': image_id_path_pattern.format(split_relate=split_relate),
     }
     return ret
