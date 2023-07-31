@@ -24,7 +24,7 @@ class SessionDatasetDrama(Dataset):
     force_create_h5:bool = False
     val_length: float = 60 # [s]
     def __init__(self, dataset_config:OmegaConf, preproc_config:OmegaConf, meg_path:str, movie_path:str,
-                 movie_trigger_path:str, meg_trigger_path:str, h5_file_name:str, sbj_name:str=None,
+                 movie_trigger_path:str, meg_trigger_path:str, h5_file_name:str, crop_points:list, sbj_name:str=None,
                  split:str='train', num_trial_limit:int=15*60, image_preprocs:str=[], meg_preprocs:list=[],
                  only_meg:bool=False, on_memory:bool=False):
         """
@@ -33,13 +33,13 @@ class SessionDatasetDrama(Dataset):
         num_section_limit(int): maximum number of sections for training. (taining only). in case of test, this parameter is ignored and use the last one section.
         h5_file_name(str): h5 file name. it contains preprocessed MEG data.
 
-        dataset_config: has attribute {meg_fs, movie_fs, movie_crop_pt1, movie_crop_pt2, kernel_root, roi_block_ids, ch_region_path}
+        dataset_config: has attribute {meg_fs, movie_crop_pt1, movie_crop_pt2, kernel_root, roi_block_ids, ch_region_path}
         preproc_config: has attribute {meg_onset, meg_duration, clamp, bandpass_filter, brain_resample_rate, src_reconstruction, baseline_duration}
         """
         self.dataset_config = dataset_config
         self.preproc_config = preproc_config
         self.meg_fs:float = dataset_config.meg_fs # [Hz]
-        self.movie_fs:float = dataset_config.movie_fs # [Hz]
+        # self.movie_fs:float = dataset_config.movie_fs # [Hz] changed to get by cv2.VideoControler
         self.meg_path = meg_path
         self.movie_path = movie_path
         self.movie_trigger_path = movie_trigger_path
@@ -56,8 +56,8 @@ class SessionDatasetDrama(Dataset):
         self.num_section_limit = num_trial_limit # int
         self.h5_file_name = h5_file_name
         self.sbj_name = sbj_name
-        self.movie_crop_pt1:Tuple = dataset_config.movie_crop_pt1 # height x width <<--caution
-        self.movie_crop_pt2:Tuple = dataset_config.movie_crop_pt2 # height x width <<--caution
+        self.movie_crop_pt1:Tuple = crop_points[0] # height x width <<--caution
+        self.movie_crop_pt2:Tuple = crop_points[1] # height x width <<--caution
         self.clamp:Tuple = self.preproc_config.clamp # a_min, a_max
         assert self.section_length < self.val_length, 'section_length {} must be smaller than val_length {}'.format(self.section_length, self.val_length)
         if self.preproc_config.brain_resample_rate is not None:
@@ -117,12 +117,12 @@ class SessionDatasetDrama(Dataset):
         elif train, this dataset consists of all data but last 60 sec.
         elif val, this dataset consists of the last 60 sec data.
         """
-        self.n_triggers_per_section = int(self.dataset_config.movie_fs / 2 * self.section_length) # [frame] 2 frames for 1 trigger
+        self.n_triggers_per_section = int(self.movie_fs / 2 * self.section_length) # [frame] 2 frames for 1 trigger
 
         movie_triggers = self.get_movie_trigger(self.movie_trigger_path, self.movie_trigger_label)
         meg_triggers = self.get_meg_trigger(self.meg_trigger_path, self.movie_trigger_label, self.decimation_rate)
         assert len(movie_triggers) == len(meg_triggers), 'len(movie_triggers) = {}, len(meg_triggers) = {}'.format(len(movie_triggers), len(meg_triggers))
-        val_frames = int(self.dataset_config.movie_fs / 2 * self.val_length) # [frame] 2 frames for 1 trigger
+        val_frames = int(self.movie_fs / 2 * self.val_length) # [frame] 2 frames for 1 trigger
         # first index of each section of val
         self.val_indices = np.arange(len(movie_triggers) - val_frames, len(movie_triggers), self.n_triggers_per_section) # [trigger id]
         self.train_indices = np.arange(0, len(movie_triggers) - val_frames, self.n_triggers_per_section) # [trigger id]
@@ -146,8 +146,12 @@ class SessionDatasetDrama(Dataset):
         # 前処理してh5ファイルにする
         MEG_Data:np.ndarray = self.get_meg_matlab_data(self.meg_path)
         MEG_Data = car_epoch(MEG_Data) # common average reference by time
+        
+        vc:VideoController = self.get_video_controler(self.movie_path)
         if not self.only_meg:
-            self.vc:VideoController = self.get_video_controler(self.movie_path)
+            self.vc = vc
+        self.movie_fs = vc.fps
+        print('VIDEO FPS: ', self.movie_fs)
         roi_channels:np.ndarray = roi(self.dataset_config) # electrode id
         if os.path.exists(self.h5_file_name) and not self.force_create_h5:
             print('load h5 file {}'.format(self.h5_file_name))
@@ -187,7 +191,7 @@ class SessionDatasetDrama(Dataset):
                 h5.create_dataset("ROI_MEG_Data", data=ROI_MEG_Data)
                 print('save ROI_MEG_Data to {}'.format(self.h5_file_name))
 
-
+        self.split_data()
 
     @staticmethod
     def get_meg_matlab_data(meg_path:str)->np.ndarray:

@@ -21,7 +21,7 @@ def get_dataset_info(name:str, h5_dir:str):
     session_ids = session_ids.replace('session_', '')
     if '~' in session_ids:
         start_id, end_id = session_ids.split('~')
-        session_ids = list(range(start_id, end_id+1))
+        session_ids = list(range(int(start_id), int(end_id+1)))
     elif session_ids == 'all':
         session_ids = list(range(1, 12+1)) # 1-12までがGODのsession
     else:

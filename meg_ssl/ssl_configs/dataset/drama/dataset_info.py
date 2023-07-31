@@ -36,8 +36,21 @@ for i, num_part in enumerate(num_parts):
 assert len(session2part_id) == np.sum(num_parts) , 'length of session2part_id must be {}'.format(np.sum(num_parts))
 assert len(session2video_id) == np.sum(num_parts) , 'length of session2video_id must be {}'.format(np.sum(num_parts))
 
+CROP_PATTERN = {
+    1: [[297, 528], [783, 1392]],
+    2: [[297, 528], [783, 1392]],
+    3: [[297, 528], [783, 1392]],
+    4: [[319, 528], [761, 1392]],
+    5: [[297, 528], [783, 1392]],
+    6: [[297, 528], [783, 1392]],
+    7: [[297, 528], [783, 1392]],
+    8: [[350, 528], [730, 1392]],
+    9: [[297, 528], [783, 1392]],
+    10: [[313, 528], [767, 1392]],
+}
 
-def get_dataset_info(name:str, h5_dir:str):
+
+def get_dataset_info(name:str, h5_dir:str, split:str):
     """_summary_
 
     Args:
@@ -50,7 +63,8 @@ def get_dataset_info(name:str, h5_dir:str):
     session_ids = session_ids.replace('session_', '')
     if '~' in session_ids:
         start_id, end_id = session_ids.split('~')
-        session_ids = list(range(start_id, end_id+1))
+        print('session_ids', session_ids, start_id, end_id)
+        session_ids = list(range(int(start_id), int(end_id)+1))
     elif session_ids == 'all':
         session_ids = list(range(40))
     else:
@@ -61,7 +75,7 @@ def get_dataset_info(name:str, h5_dir:str):
         for session_id in session_ids:
             video_id = session2video_id[session_id]
             part_id = session2part_id[session_id]
-            ret = dataset_path(sbj, video_id, part_id, h5_dir)
+            ret = dataset_path(sbj, video_id, part_id, h5_dir, split)
             dataset_info_list.append(ret)
     print('=================GOD=================')
     print(name)
@@ -69,16 +83,27 @@ def get_dataset_info(name:str, h5_dir:str):
     print('=====================================')
     return dataset_info_list
 
-def dataset_path(sbj:int, video_id:int, part_id:int, h5_dir):
+def dataset_path(sbj:int, video_id:int, part_id:int, h5_dir:str, split:str):
     sbj = 'sbj{}'.format(str(sbj).zfill(2))
     movie_name = movie_file_list[video_id-1].format(part_id=part_id)
+    session_name = movie_name.replace('.mp4', '.mat')
 
+    # 例外処理: 先方のmatファイル作成時のタイポ
+    if video_id == 2: 
+        session_name = session_name.replace('_id2_', '_id1_')
+    if video_id == 8:
+        if part_id < 6:
+            session_name = session_name.replace('Vol1-1', 'Vol1_1')
+        else:
+            session_name = session_name.replace('Vol1-1', 'vol1-1')
     ret = {
-        'meg_path': processed_meg_path_pattern.format(sub=sbj, session_name=movie_name.replace('.mp4', '.mat')),
+        'meg_path': processed_meg_path_pattern.format(sub=sbj, session_name=session_name),
         'movie_path': os.path.join(VIDEO_ROOT, movie_name),
         'movie_trigger_path': movie_trigger_path_pattern.format(sub=sbj, video_id=video_id, part_id=part_id),
         'meg_trigger_path': meg_trigger_path_pattern.format(sub=sbj, video_id=video_id, part_id=part_id),
         'sbj_name': sbj,
         'h5_file_name': os.path.join(h5_dir, '{}_{}.h5'.format(sbj, movie_name)),
+        'split': split,
+        'movie_crop_pts': CROP_PATTERN[video_id]
     }
     return ret

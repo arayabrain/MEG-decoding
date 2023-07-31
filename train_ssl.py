@@ -9,8 +9,8 @@ import wandb
 
 # get dataset
 def get_dataset(cfg:OmegaConf):
-    dataset_names:dict = cfg.dataset
-    import pdb; pdb.set_trace()
+    dataset_names:dict = cfg.dataset_name
+    # import pdb; pdb.set_trace()
     dataset_yamls:dict = cfg.dataset_yaml
     num_trial_limit:dict = cfg.total_limit
     preproc_config:OmegaConf = cfg.preprocess

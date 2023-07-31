@@ -19,11 +19,13 @@ class VideoController(object):
         """
         self.movie_path = movie_path
         if self.movie_path != 0 and not os.path.exists(movie_path):
+            print('while loading {}, following eception occurs.'.format(self.movie_path))
             raise FileNotFoundError("camera or video cannot be not opened.")
 
         self.video_capture = cv2.VideoCapture(movie_path)
 
         if not self.video_capture.isOpened():
+            print('while loading {}, following eception occurs.'.format(self.movie_path))
             raise ValueError("camera or video cannot be not opened.")
 
         self._frame_num = self.video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
