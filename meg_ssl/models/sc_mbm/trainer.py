@@ -1,10 +1,10 @@
 import math, sys
 import torch
 from . import utils as ut
-from torch._six import inf
+from torch import inf
 import numpy as np
 import time
-from ssl.trainers.base_trainer import BaseSSLTrainer
+from meg_ssl.trainers.base_trainer import BaseSSLTrainer
 import timm.optim.optim_factory as optim_factory
 import tqdm
 import matplotlib.pyplot as plt

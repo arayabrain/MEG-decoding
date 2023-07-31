@@ -2,8 +2,8 @@ import argparse
 from hydra import compose, initialize
 import sys
 sys.path.append('.')
-from ssl.dataclass import parse_dataset
-from ssl.models import get_model_and_trainer
+from meg_ssl.dataclass import parse_dataset
+from meg_ssl.models import get_model_and_trainer
 from omegaconf import OmegaConf
 import wandb
 
@@ -66,15 +66,17 @@ def parse_args():
     parser.add_argument('--config', type=str, default='ssl/ssl_configs/test_config.yaml')
     parser.add_argument('--resume', type=str, default=None)
     parser.add_argument('--wandbkey', type=str, default=None) # default='/home/yainoue/wandb_inoue.txt')
-    parser.add_argument('device_counts', type=int, default=1)
+    parser.add_argument('--device_counts', type=int, default=1)
 
     args = parser.parse_args()
-    print(args.accumulate(args.integers))
+    print('args: \n', args)
     return args
 
 
 if __name__ == '__main__':
     args = parse_args()
-    initialize(config_path='ssl/ssl_configs/')
-    cfg = compose(args.config, args.wandbkey, args.device_counts)
+    initialize(config_path='meg_ssl/ssl_configs/')
+    cfg = compose(args.config)
     cfg.resume_path = args.resume
+
+    run(cfg, args.wandbkey, args.device_counts)

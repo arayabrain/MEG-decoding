@@ -6,8 +6,8 @@ from torch.utils.data import Sampler, Dataset, ConcatDataset
 from .drama import SessionDatasetDrama
 from .god import SessionDatasetGOD
 from torch.utils.data import ConcatDataset
-from ssl.ssl_configs.dataset.drama.dataset_info import get_dataset_info as get_drama_dataset_info
-from ssl.ssl_configs.dataset.god.dataset_info import get_dataset_info as get_god_dataset_info
+from meg_ssl.ssl_configs.dataset.drama.dataset_info import get_dataset_info as get_drama_dataset_info
+from meg_ssl.ssl_configs.dataset.GOD.dataset_info import get_dataset_info as get_god_dataset_info
 
 def parse_dataset(dataset_names:dict, dataset_yamls:dict, preproc_config:OmegaConf,
                   num_trial_limits_dict:dict, h5_root:str, image_preprocs:list=[], meg_preprocs:list=[],
@@ -20,7 +20,7 @@ def parse_dataset(dataset_names:dict, dataset_yamls:dict, preproc_config:OmegaCo
         num_trial_limits (dict): {'train':{'drama':12000}, 'val':{'god': 1200}}
     """
     split_datasets = {}
-    initialize(config_path="./ssl/ssl_configs/dataset")
+    initialize(config_path="./meg_ssl/ssl_configs/dataset")
     for split, name_dict in dataset_names.items():
         dataset_info_list = []
         dataset_config_list = []

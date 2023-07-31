@@ -68,3 +68,7 @@ ID05_SuitsVol1-1_id5_MEG_DATAPixx_part5.mp4         ID10_GhostInTheShellVol1-1_i
     5. Auditory
     6. Early Auditory
     7. Auditory Associsation
+
+
+### コマンド履歴
+`python train_ssl.py --config test_config  --device_counts 1`
