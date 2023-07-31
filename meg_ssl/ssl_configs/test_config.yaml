@@ -1,8 +1,8 @@
 defaults:
 # ========model========
-    - model:  scmbm
+    model:  scmbm
 # ========prerpocessing========
-    - preprocess:  base
+    preprocess:  base
 # ========dataset========
 dataset:
     train:
