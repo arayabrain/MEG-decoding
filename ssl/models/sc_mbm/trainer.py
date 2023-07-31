@@ -106,15 +106,16 @@ class Trainer(BaseSSLTrainer):
         return loss_value, cor.item()
 
     @torch.no_grad()
-    def plot_recon_figures2(self, epoch:int=None):
+    def plot_recon_figures2(self, epoch:int=None, split:str='val'):
         self.model.eval()
         fig, axs = plt.subplots(5, 2, figsize=(20,15))
         fig.tight_layout()
         axs[0,0].set_title('Ground-truth')
         # axs[0,1].set_title('Masked Ground-truth')
+        dataloader = self.val_loader if split=='val' else self.train_loader
         axs[0,1].set_title('Reconstruction')
         for ax in axs:
-            sample = next(iter(self.val_loader))
+            sample = next(iter(dataloader))
             sample = sample.to(self.device)
             _, pred, mask = self.model(sample, mask_ratio=self.config.mask_ratio)
             # sample_with_mask = model_without_ddp.patchify(sample.transpose(1,2))[0].to('cpu').numpy().reshape(-1, model_without_ddp.patch_size)
