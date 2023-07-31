@@ -9,6 +9,9 @@
 1. BLIP
 2. CLIP
 
+## GOD
+/storage/dataset/image/ImageNet/ILSVRC2012_val/
+
 ## MEG-Movie (yanagisawa-lab)
 ### video name
 動画は10タイトルで、各タイトル複数パートに分割して提示した(40 sessions)。その際分割された動画の長さは15分以内に収まるようになっている。
