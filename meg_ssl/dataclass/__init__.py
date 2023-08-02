@@ -46,7 +46,7 @@ def parse_dataset(dataset_names:dict, dataset_yamls:dict, preproc_config:OmegaCo
                 dataset_config_list += [cfg] * len(dataset_info_list)
                 num_trial_limits += [int(num_trial_limits_dict[split][name]/len(dataset_info_list))] * len(dataset_info_list)
 
-            split_datasets[name] = collect_session_dataset(dataset_info_list, dataset_config_list, preproc_config,
+            split_datasets[split] = collect_session_dataset(dataset_info_list, dataset_config_list, preproc_config,
                         num_trial_limits, image_preprocs, meg_preprocs, only_meg, on_memory)
     return split_datasets
 
@@ -74,7 +74,7 @@ def get_session_dataset(dataset_info:dict, dataset_config:OmegaConf, preproc_con
     elif dataset_config.name == 'GOD':
         return SessionDatasetGOD(dataset_config, preproc_config, dataset_info['meg_path'], dataset_info['image_root'],
                                  dataset_info['meg_trigger_path'], dataset_info['meg_label_path'], dataset_info['h5_file_name'],
-                                 sbj_name=dataset_info['sbj_name'], image_preprocs=image_preprocs, meg_preprocs=meg_preprocs,
+                                 dataset_info['image_id_path'], sbj_name=dataset_info['sbj_name'], image_preprocs=image_preprocs, meg_preprocs=meg_preprocs,
                                  num_trial_limit=num_trial_limit, only_meg=only_meg, on_memory=on_memory)
     else:
         raise ValueError('dataset_config.name {} is not supported'.format(dataset_config.name))

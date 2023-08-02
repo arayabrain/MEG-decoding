@@ -6,7 +6,7 @@ defaults:
 # ========dataset========
 dataset_name:
     train:
-        drama: sbj_1-session_1~3 # all 1_3, 1~3
+        drama: sbj_1-session_1 # all 1_3, 1~3
     val:
         GOD: sbj_1-train-session_6_12
 dataset_yaml:
@@ -14,9 +14,9 @@ dataset_yaml:
     GOD: GOD/god_vc.yaml # god_config.yaml
 total_limit:
     train:
-        drama: 1000 # total number of samples across sessions
+        drama: 10 # total number of samples across sessions
     val:
-        GOD: 1200 # total number of samples across sessions
+        GOD: 100 # total number of samples across sessions
 
 # ========path========
 h5_root: ../../../dataset/ssl_dataset/test
@@ -25,9 +25,9 @@ resume_path: null
 # ========training========
 training: 
     precision: 16
-    val_check_interval: 10
+    val_check_interval: 100
     num_workers: 4 # 4
-    batch_size: 100
+    batch_size: 10
     lr: 2.5e-4
     min_lr: 0
     weight_decay: 0.05
@@ -35,8 +35,8 @@ training:
     warmup_epochs: 40
     clip_grad: 0.8
     accum_iter: 1
-    mask_ratio: 0.75
+    mask_ratio: 0.1
     
-    logdir: '../../results_ssl/test/log'
-    ckpt_dir: '../../results_ssl/test/ckpt'
-    reconst_fig_dir: '../../results_ssl/test/reconst_fig2'
+    logdir: '../../results_ssl/overfit/log'
+    ckpt_dir: '../../results_ssl/overfit/ckpt'
+    reconst_fig_dir: '../../results_ssl/overfit/reconst_fig'

@@ -68,7 +68,7 @@ def get_dataset_info(name:str, h5_dir:str, split:str):
     elif session_ids == 'all':
         session_ids = list(range(40))
     else:
-        session_ids = session_ids.split('_')
+        session_ids = [int(s) for s in session_ids.split('_')]
     assert len(session_ids) > 0, 'session_ids must be list or range'
     dataset_info_list = []
     for sbj in sbjs:

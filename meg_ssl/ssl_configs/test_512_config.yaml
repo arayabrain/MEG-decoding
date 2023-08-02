@@ -2,7 +2,7 @@ defaults:
 # ========model========
     - model:  scmbm
 # ========prerpocessing========
-    - preprocess:  base
+    - preprocess:  base_512
 # ========dataset========
 dataset_name:
     train:
@@ -19,7 +19,7 @@ total_limit:
         GOD: 1200 # total number of samples across sessions
 
 # ========path========
-h5_root: ../../../dataset/ssl_dataset/test
+h5_root: ../../../dataset/ssl_dataset/test512
 resume_path: null
 
 # ========training========
@@ -37,6 +37,6 @@ training:
     accum_iter: 1
     mask_ratio: 0.75
     
-    logdir: '../../results_ssl/test/log'
-    ckpt_dir: '../../results_ssl/test/ckpt'
-    reconst_fig_dir: '../../results_ssl/test/reconst_fig2'
+    logdir: '../../results_ssl/test512/log'
+    ckpt_dir: '../../results_ssl/test512/ckpt'
+    reconst_fig_dir: '../../results_ssl/test512/reconst_fig2'

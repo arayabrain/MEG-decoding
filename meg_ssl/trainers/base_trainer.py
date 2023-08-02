@@ -6,28 +6,31 @@ from torch.nn.parallel import DistributedDataParallel
 import tqdm
 import numpy as np
 from logging import getLogger
+import wandb
 
 
 class BaseSSLTrainer():
     global_rank=0
     def __init__(self,config, device_count:int, usewandb:bool):
         """
-        config: OmegaConf {precision, max_epochs, val_check_interval, logdir, num_workers, batch_size, ckpt_dir}
+        config: OmegaConf {precision, num_epoch, val_check_interval, logdir, num_workers, batch_size, ckpt_dir}
         """
         self.logger = getLogger(__name__)
         self.config = config
         self.device_count = device_count
         self.device = 'cuda' if device_count > 0 else 'cpu'
         self.precision = config.precision
-        self.max_epochs = config.max_epochs
+        self.num_epoch = config.num_epoch
         self.val_check_interval = config.val_check_interval
         self.logdir = config.logdir
         self.usewandb = usewandb
-        if self.global_rank == 0:
+        self.ckpt_dir = self.config.ckpt_dir
+        if self.global_rank > 0:
             self.usewandb = False
-        if self.usewandb:
-            import wandb
-            wandb.config.update(config)
+        else:
+            self.usewandb = usewandb
+    
+            # wandb.config.update(config)
         self.num_workers = config.num_workers
         self.logger.info("Preparing to fit...")
 
@@ -45,6 +48,7 @@ class BaseSSLTrainer():
 
     def before_train(self, model, train_dataset, val_dataset, ckpt_path):
         self.model = model
+        os.makedirs(self.ckpt_dir, exist_ok=True)
         if ckpt_path is not None:
             self.model.load_state_dict(torch.load(ckpt_path))
             print('load from ', ckpt_path)
@@ -64,12 +68,12 @@ class BaseSSLTrainer():
         pass
 
     def train(self):
-        for epoch in range(self.max_epochs):
-            print('[{}/{}Epoch] start'.format(epoch, self.max_epochs))
+        for epoch in range(self.num_epoch):
+            print('[{}/{}Epoch] start'.format(epoch, self.num_epoch))
             self.before_epoch()
-            train_metric = self.train_one_epoch()
+            train_metric = self.train_one_epoch(epoch)
             train_metric.update({'epoch':epoch})
-            self.after_epoch(train_metric)
+            self.after_epoch(epoch, train_metric)
 
     def after_train(self):
         if self.global_rank == 0:
@@ -86,11 +90,12 @@ class BaseSSLTrainer():
                 lr = param_group['lr']
                 break
             train_metrics.update({'lr':lr})
+            print('lr: ', lr)
             # logging
             self.pkl_logger.log(train_metrics, 'train')
             # validation
             if epoch % self.val_check_interval == 0:
-                val_metrics = self.val_epoch()
+                val_metrics = self.validation(epoch)
                 val_metrics.update({'epoch':epoch})
                 # logging
                 self.pkl_logger.log(val_metrics, 'val')
@@ -101,7 +106,6 @@ class BaseSSLTrainer():
                     self.save_model('best.pth')
 
                 train_metrics.update(val_metrics)
-
             if self.usewandb:
                 wandb.log(train_metrics)
 
@@ -111,7 +115,7 @@ class BaseSSLTrainer():
         epoch_loss = []
         with tqdm.tqdm(self.train_loader) as pbar:
             for step, batch in enumerate(pbar):
-                loss = self.train_one_step(batch, epoch)
+                loss = self.train_one_step(step, batch)
                 pbar.set_description("[Epoch {}] step={},loss={}".format(
                     epoch, step, np.mean(loss)))
                 epoch_loss.append(loss)
@@ -133,7 +137,7 @@ class BaseSSLTrainer():
         pass
 
     def save_model(self, filename:str):
-        filepath =  os.path.join(self.config.ckpt_dir, filename)
+        filepath =  os.path.join(self.ckpt_dir, filename)
         torch.save(self.model.state_dict(),filepath)
         print('model is saved as ', filepath)
 

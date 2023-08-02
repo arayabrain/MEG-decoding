@@ -3,21 +3,26 @@ from typing import List, Tuple
 from torch.utils.data import Sampler, Dataset
 import numpy as np
 import mne
-from tqdm import tqdm
-from meg_decoding.matlab_utils.load_meg import roi
-import tqdm
-import torch
 import h5py
-from meg_decoding.video_utils.video_controller import VideoController
-from meg_decoding.dataclass.god import get_kernel_block_ids, get_common_kernel
-from .utils import z_score_epoch, car_epoch, clamp_epoch
+
 import scipy.io
 mne.set_log_level(verbose="WARNING")
-import bdpy
 from omegaconf import OmegaConf
 import pandas as pd
 import random
 import cv2
+try:
+    from meg_decoding.video_utils.video_controller import VideoController
+    from meg_decoding.dataclass.god import get_kernel_block_ids, get_common_kernel
+    from meg_decoding.matlab_utils.load_meg import roi
+    from .utils import z_score_epoch, car_epoch, clamp_epoch
+except ModuleNotFoundError:
+    import sys
+    sys.path.append('.')
+    from meg_decoding.video_utils.video_controller import VideoController
+    from meg_decoding.dataclass.god import get_kernel_block_ids, get_common_kernel
+    from meg_decoding.matlab_utils.load_meg import roi
+    from meg_ssl.dataclass.utils import z_score_epoch, car_epoch, clamp_epoch
 
 
 class SessionDatasetDrama(Dataset):
@@ -68,10 +73,13 @@ class SessionDatasetDrama(Dataset):
 
         self.baseline_duration:float = self.preproc_config.baseline_duration # [s]
         self.baseline_duration_frames = int(self.baseline_duration * self.meg_fs / self.decimation_rate) # [frame]
-        self.meg_durarion_frames = int(self.meg_durarion * self.meg_fs / self.decimation_rate) # [frame]
+        self.meg_duration_frames = int(np.round(self.meg_durarion * self.meg_fs / self.decimation_rate)) # [frame]
         self.meg_onset_frames = int(self.meg_onset * self.meg_fs / self.decimation_rate) # [frame]
+        # baseline|meg_frame|meg_onset|meg_duration
 
         self.prepare_data()
+
+
 
     def __len__(self)->int:
         return len(self.indices)
@@ -81,7 +89,7 @@ class SessionDatasetDrama(Dataset):
         movie_frame = self.movie_triggers[target_idx]
         meg_frame = self.meg_triggers[target_idx]
         baseline_frame = meg_frame - self.baseline_duration_frames
-        end_frame = meg_frame + self.meg_onset_frames + self.meg_durarion_frames
+        end_frame = meg_frame + self.meg_onset_frames + self.meg_duration_frames
 
         if self.on_memory:
             ROI_MEG_Data = self.ROI_MEG_Data[:, baseline_frame:end_frame] # ch x time
@@ -91,13 +99,12 @@ class SessionDatasetDrama(Dataset):
          # z-score -> baseline correction -> clamp
         ROI_MEG_Data = z_score_epoch(ROI_MEG_Data) # z-score by channel across time
         ROI_MEG_Data -= np.mean(ROI_MEG_Data[:, :self.baseline_duration_frames], axis=1)[:, np.newaxis] # baseline correction
-        ROI_MEG_Data = ROI_MEG_Data[:, self.meg_onset_frames:] # remove before onset
+        ROI_MEG_Data = ROI_MEG_Data[:, -self.meg_duration_frames:] # ROI_MEG_Data[:, self.meg_onset_frames:] # remove before onset
         if self.clamp is not None:
             ROI_MEG_Data = clamp_epoch(ROI_MEG_Data, *self.clamp)
 
         for func_ in self.meg_preprocs:
             ROI_MEG_Data = func_(ROI_MEG_Data)
-
         if self.only_meg:
             return ROI_MEG_Data # , movie_frame # movie_frame is dummy
         else:
@@ -145,8 +152,15 @@ class SessionDatasetDrama(Dataset):
         # CAR -> (src_reconst) -> bandpass filter -> resample
         # 前処理してh5ファイルにする
         MEG_Data:np.ndarray = self.get_meg_matlab_data(self.meg_path)
-        MEG_Data = car_epoch(MEG_Data) # common average reference by time
-        
+        # plt.plot(MEG_Data[[128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154], 
+        #                   11000:12000].T)
+        # plt.savefig(self.h5_file_name.replace('.h5', '_a.png'))
+        # plt.close()
+        # MEG_Data = car_epoch(MEG_Data) # common average reference by time ここでやるとトリガーも入ってしまう
+        # plt.plot(MEG_Data[[128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154], 
+        #                   11000:12000].T)
+        # plt.savefig(self.h5_file_name.replace('.h5', '_b.png'))
+        # plt.close()
         vc:VideoController = self.get_video_controler(self.movie_path)
         if not self.only_meg:
             self.vc = vc
@@ -160,6 +174,7 @@ class SessionDatasetDrama(Dataset):
         else:
             # -----MEG-----
             ROI_MEG_Data = MEG_Data[roi_channels, :]
+            ROI_MEG_Data = car_epoch(ROI_MEG_Data) # common average reference by time
             if self.preproc_config.src_reconstruction:
                 assert len(ROI_MEG_Data) == 160, 'get {}'.format(len(ROI_MEG_Data))
                 print('src reconstruction')
@@ -172,18 +187,27 @@ class SessionDatasetDrama(Dataset):
                 print('apply kernel for source reconstruction')
             else:
                 pass
+            # plt.plot(ROI_MEG_Data[:, 11000:12000].T)
+            # plt.savefig(self.h5_file_name.replace('.h5', '_A.png'))
+            # plt.close()
             if self.preproc_config.bandpass_filter is not None:
                 bandpass_filter_low = self.preproc_config.bandpass_filter[0]
                 bandpass_filter_high = self.preproc_config.bandpass_filter[1]
                 ROI_MEG_Data = mne.filter.filter_data(ROI_MEG_Data, sfreq=self.meg_fs, l_freq=bandpass_filter_low, h_freq=bandpass_filter_high,)
                 print(f'band path filter: {bandpass_filter_low}-{bandpass_filter_high}')
-            if self.preproc_config.brain_resample_rate is not None:
+            # plt.plot(ROI_MEG_Data[:, 11000:12000].T)
+            # plt.savefig(self.h5_file_name.replace('.h5', '_B.png'))
+            # plt.close()
+            if self.preproc_config.brain_resample_rate is not None or (self.preproc_config.brain_resample_rate<self.meg_fs):
                 ROI_MEG_Data = mne.filter.resample(ROI_MEG_Data, down=self.meg_fs / self.preproc_config.brain_resample_rate)
                 print('resample {} to {} Hz'.format(self.meg_fs, self.preproc_config.brain_resample_rate))
-
+            # plt.plot(ROI_MEG_Data[:, 11000:12000].T)
+            # plt.savefig(self.h5_file_name.replace('.h5', '_C.png'))
+            # plt.close()
         assert ROI_MEG_Data.shape[0] == len(roi_channels), 'ROI_MEG_Data.shape[0] = {}, len(roi_channels) = {}'.format(ROI_MEG_Data.shape[0], len(roi_channels))
         assert ROI_MEG_Data.ndim == 2, 'ROI_MEG_Data.ndim = {}'.format(ROI_MEG_Data.ndim)
 
+        ROI_MEG_Data = ROI_MEG_Data.astype(np.float32)
         if self.on_memory:
             self.ROI_MEG_Data = ROI_MEG_Data
         else:
@@ -192,6 +216,7 @@ class SessionDatasetDrama(Dataset):
                 print('save ROI_MEG_Data to {}'.format(self.h5_file_name))
 
         self.split_data()
+        self.num_electrodes = ROI_MEG_Data.shape[0]
 
     @staticmethod
     def get_meg_matlab_data(meg_path:str)->np.ndarray:
@@ -219,3 +244,37 @@ class SessionDatasetDrama(Dataset):
         trigger /= decimation_rate
         trigger = np.floor(trigger).astype(np.int)
         return trigger
+
+
+if __name__ == '__main__':
+    # run under "MEG-decoding"
+    from hydra import initialize, compose
+    from meg_ssl.ssl_configs.dataset.drama.dataset_info import get_dataset_info
+    import matplotlib.pyplot as plt
+    import h5py
+
+    # load config
+    config_name = 'test_config'
+    with initialize(config_path='../../meg_ssl/ssl_configs/'):
+        main_cfg = compose(config_name)
+    with initialize(config_path="../../meg_ssl/ssl_configs/dataset"):
+        dataset_config = compose('drama/drama_vc').drama
+    
+    preproc_config = main_cfg.preprocess
+    dataset_infos = get_dataset_info('sbj_1-session_1~3', '/home/yainoue/meg2image/codes/MEG-decoding/tmps', 'train')
+    dataset_info = dataset_infos[0]
+    dataset = SessionDatasetDrama(dataset_config, preproc_config, dataset_info['meg_path'], dataset_info['movie_path'],
+                                   dataset_info['movie_trigger_path'], dataset_info['meg_trigger_path'], dataset_info['h5_file_name'],
+                                   dataset_info['movie_crop_pts'], sbj_name=dataset_info['sbj_name'], split=dataset_info['split'], 
+                                   num_trial_limit=100, image_preprocs=[], meg_preprocs=[],
+                                   only_meg=True, on_memory=False)
+    
+
+    with h5py.File(dataset.h5_file_name, "r") as h5:
+        ROI_MEG_Data = h5['ROI_MEG_Data'][:,:] # ndim =2
+
+    plt.plot(ROI_MEG_Data[:, 11000:12000].T)
+    plt.savefig(dataset.h5_file_name.replace('.h5', '.png'))
+    plt.close()
+    print('save to ', dataset.h5_file_name.replace('.h5', '.png'))
+    
