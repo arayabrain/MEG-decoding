@@ -9,6 +9,9 @@ from torch.utils.data import ConcatDataset
 from meg_ssl.ssl_configs.dataset.drama.dataset_info import get_dataset_info as get_drama_dataset_info
 from meg_ssl.ssl_configs.dataset.GOD.dataset_info import get_dataset_info as get_god_dataset_info
 
+
+BLACK_MAT_FILE_LIST = ['sbj01/ID08_DreamGirlsVol1_1_id8_MEG_DATAPixx_part4.mat']
+
 def parse_dataset(dataset_names:dict, dataset_yamls:dict, preproc_config:OmegaConf,
                   num_trial_limits_dict:dict, h5_root:str, image_preprocs:list=[], meg_preprocs:list=[],
                   only_meg:bool=False, on_memory:bool=False)->dict:
@@ -56,6 +59,14 @@ def collect_session_dataset(dataset_info_list:List[Dict], dataset_config_list:Li
     dataset_list = []
     for dataset_info, dataset_config, num_trial_limit in zip(dataset_info_list, dataset_config_list, num_trial_limits):
         dataset = get_session_dataset(dataset_info, dataset_config, preproc_config, num_trial_limit, image_preprocs, meg_preprocs, only_meg, on_memory)
+        skip_flag = 0
+        for black in BLACK_MAT_FILE_LIST:
+            if black in dataset.meg_path:
+                skip_flag = 1
+                break
+        if skip_flag == 1:
+            print('skipping the following dataset: ', dataset.meg_path)
+            continue
         dataset_list.append(dataset)
 
     return ConcatDataset(dataset_list)

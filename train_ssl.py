@@ -77,6 +77,8 @@ def parse_args():
     parser.add_argument('--resume', type=str, default=None)
     parser.add_argument('--wandbkey', type=str, default=None) # default='/home/yainoue/wandb_inoue.txt')
     parser.add_argument('--device_counts', type=int, default=1)
+    parser.add_argument('--exp', type=str, default=None)
+    parser.add_argument('--h5name', type=str, default=None)
     parser.add_argument('--seed', type=int, default=42)
 
     args = parser.parse_args()
@@ -92,11 +94,21 @@ if __name__ == '__main__':
     if args.model is not None:
         with initialize(config_path='meg_ssl/ssl_configs/model'):
             cfg.model = compose(args.model)
-        print('model config is overrided by ', args.model)
+        print('INFO ========= model config is overrided by ', args.model)
     if args.preprocess is not None:
         with initialize(config_path='meg_ssl/ssl_configs/preprocess'):
             cfg.preprocess = compose(args.preprocess)
-        print('preprocess config is overrided by', args.preprocess)
+        print('INFO ========= preprocess config is overrided by', args.preprocess)
+    # num_electrodes, fs, bpがh5ファイルに関係している
+    if args.h5name is None:
+        cfg.h5_root = cfg.h5_root.format(h5_name='fs{}-bp{}_{}'.format(cfg.preprocess.brain_resample_rate, *cfg.preprocess.bandpass_filter))
+    else:
+        cfg.h5_root = cfg.h5_root.format(h5_name=args.h5name)
+    if args.exp is None:
+        args.exp = args.config
+    cfg.training.logdir = cfg.training.logdir.format(exp_name=args.exp)
+    cfg.training.ckpt_dir = cfg.training.ckpt_dir.format(exp_name=args.exp)
+    cfg.training.reconst_fig_dir = cfg.training.reconst_fig_dir.format(exp_name=args.exp)
 
     cfg.resume_path = args.resume
 

@@ -141,9 +141,12 @@ class SessionDatasetGOD(Dataset):
         if self.on_memory:
             self.ROI_MEG_Data = ROI_MEG_Data
         else:
-            with h5py.File(self.h5_file_name, "w") as h5:
-                h5.create_dataset("ROI_MEG_Data", data=ROI_MEG_Data)
-                print('save ROI_MEG_Data to {}'.format(self.h5_file_name))
+            if os.path.exists(self.h5_file_name) and not self.force_create_h5:
+                pass
+            else:
+                with h5py.File(self.h5_file_name, "w") as h5:
+                    h5.create_dataset("ROI_MEG_Data", data=ROI_MEG_Data)
+                    print('save ROI_MEG_Data to {}'.format(self.h5_file_name))
 
         self.meg_triggers = self.get_meg_trigger(self.meg_trigger_path, self.decimation_rate, self.meg_fs) # [frame]
         self.meg_labels = self.get_meg_label(self.meg_label_path) # [frame]

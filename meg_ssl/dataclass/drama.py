@@ -96,8 +96,12 @@ class SessionDatasetDrama(Dataset):
         else:
             with h5py.File(self.h5_file_name, "r") as h5:
                 ROI_MEG_Data = h5['ROI_MEG_Data'][:,baseline_frame:end_frame]
-         # z-score -> baseline correction -> clamp
+        # z-score -> baseline correction -> clamp
         ROI_MEG_Data = z_score_epoch(ROI_MEG_Data) # z-score by channel across time
+        if np.isnan(ROI_MEG_Data.sum()):
+            # sbj01_ID08_DreamGirlsVol1-1_id8_MEG_DATAPixx_part4 13ch-22chが0
+            print('While handling {} (MEG file), following exception occur.'.format(self.meg_path))
+            raise Exception('nan is detected.')  
         ROI_MEG_Data -= np.mean(ROI_MEG_Data[:, :self.baseline_duration_frames], axis=1)[:, np.newaxis] # baseline correction
         ROI_MEG_Data = ROI_MEG_Data[:, -self.meg_duration_frames:] # ROI_MEG_Data[:, self.meg_onset_frames:] # remove before onset
         if self.clamp is not None:
@@ -211,9 +215,12 @@ class SessionDatasetDrama(Dataset):
         if self.on_memory:
             self.ROI_MEG_Data = ROI_MEG_Data
         else:
-            with h5py.File(self.h5_file_name, "w") as h5:
-                h5.create_dataset("ROI_MEG_Data", data=ROI_MEG_Data)
-                print('save ROI_MEG_Data to {}'.format(self.h5_file_name))
+            if os.path.exists(self.h5_file_name) and not self.force_create_h5:
+                pass
+            else:
+                with h5py.File(self.h5_file_name, "w") as h5:
+                    h5.create_dataset("ROI_MEG_Data", data=ROI_MEG_Data)
+                    print('save ROI_MEG_Data to {}'.format(self.h5_file_name))
 
         self.split_data()
         self.num_electrodes = ROI_MEG_Data.shape[0]

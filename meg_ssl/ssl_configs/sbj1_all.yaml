@@ -2,7 +2,7 @@ defaults:
 # ========model========
     - model:  scmbm
 # ========prerpocessing========
-    - preprocess:  basedataloader.batch_size
+    - preprocess: base
             
 # ========dataset========
 dataset_name:
@@ -40,4 +40,4 @@ training:
     
     logdir: '../../results_ssl/{exp_name}/log'
     ckpt_dir: '../../results_ssl/{exp_name}/ckpt'
-    reconst_fig_dir: '../../results_ssl/{exp_name}/reconst_fig2'
+    reconst_fig_dir: '../../results_ssl/{exp_name}/reconst_fig'
