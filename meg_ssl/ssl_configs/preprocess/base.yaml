@@ -1,5 +1,5 @@
-meg_onset: 0.15
-meg_duration: 0.25
+meg_onset: 0.2 # 0.15
+meg_duration: 0.2 # 0.25
 clamp: [-12, 12]
 bandpass_filter: [2, 120]
 brain_redsample_rate: 240
