@@ -1,0 +1,17 @@
+name: eegnet
+parameters:
+  k1: 10 # 960
+  k2: 4 # 96
+  F1: 16
+  F2: 32
+  D: 2
+  # p0: 10
+  p1: 2 # 40
+  p2: 4 # 80
+  dr1: 0.25
+  dr2: 0.38
+  # for EEGNet_Multi
+  n_head: 8
+  dim_per_head: 64
+  fc1: 256
+  fc2: 128

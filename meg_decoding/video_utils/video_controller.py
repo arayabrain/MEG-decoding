@@ -3,7 +3,7 @@ from typing import List, Optional
 
 import cv2
 import numpy as np
-import numpy.typing as npt
+# import numpy.typing as npt
 
 
 class VideoController(object):
@@ -43,7 +43,7 @@ class VideoController(object):
     def current_frame(self) -> float:
         return self.video_capture.get(cv2.CAP_PROP_POS_FRAMES)
 
-    def get_current_image(self) -> npt.NDArray[np.uint8]:
+    def get_current_image(self) :#-> npt.NDArray[np.uint8]:
         """get image at current index of video.
 
         Raises:
@@ -57,7 +57,7 @@ class VideoController(object):
             raise ValueError("cannot read frame.")
         return frame
 
-    def get_image_at(self, frame_idx: int) -> npt.NDArray[np.uint8]:
+    def get_image_at(self, frame_idx: int) :# -> npt.NDArray[np.uint8]:
         """get image at designated frame index.
 
         Args:
@@ -75,7 +75,7 @@ class VideoController(object):
         self.video_capture.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
         return self.get_current_image()
 
-    def get_random_image(self) -> npt.NDArray[np.uint8]:
+    def get_random_image(self) :#-> npt.NDArray[np.uint8]:
         frame_idx = np.random.random_integers(0, int(self.frame_num) - 1)
         return self.get_image_at(frame_idx=frame_idx)
 
