@@ -22,7 +22,7 @@ class SessionDatasetGOD(Dataset):
     force_create_h5:bool = False
 
     def __init__(self, dataset_config:OmegaConf, preproc_config:OmegaConf, meg_path:str, image_root:str,
-                 meg_trigger_path:str, meg_label_path:str, h5_file_name:str, sbj_name:str=None,
+                 meg_trigger_path:str, meg_label_path:str, h5_file_name:str, image_id_path:str, sbj_name:str=None,
                  image_preprocs:str=[], meg_preprocs:list=[], num_trial_limit:int=1200,
                  only_meg:bool=False, on_memory:bool=False):
         """
@@ -35,7 +35,7 @@ class SessionDatasetGOD(Dataset):
         self.meg_path = meg_path
         self.image_root = image_root
         self.meg_label_path = meg_label_path
-        self.image_id_path = dataset_config.image_id_path
+        self.image_id_path = image_id_path
         self.meg_trigger_path = meg_trigger_path
         self.image_preprocs = image_preprocs # list
         self.meg_preprocs = meg_preprocs # list
@@ -47,7 +47,6 @@ class SessionDatasetGOD(Dataset):
         self.sbj_name = sbj_name
         self.num_image_limit =num_trial_limit
         self.clamp:Tuple = self.preproc_config.clamp # a_min, a_max
-        assert self.section_length < self.val_length, 'section_length {} must be smaller than val_length {}'.format(self.section_length, self.val_length)
         if self.preproc_config.brain_resample_rate is not None:
             self.decimation_rate:float = self.meg_fs / self.preproc_config.brain_resample_rate
         else:
@@ -56,7 +55,7 @@ class SessionDatasetGOD(Dataset):
 
         self.baseline_duration:float = self.preproc_config.baseline_duration # [s]
         self.baseline_duration_frames = int(self.baseline_duration * self.meg_fs / self.decimation_rate) # [frame]
-        self.meg_durarion_frames = int(self.meg_durarion * self.meg_fs / self.decimation_rate) # [frame]
+        self.meg_duration_frames = int(np.round(self.meg_durarion * self.meg_fs / self.decimation_rate)) # [frame]
         self.meg_onset_frames = int(self.meg_onset * self.meg_fs / self.decimation_rate) # [frame]
 
         self.prepare_data()
@@ -68,8 +67,7 @@ class SessionDatasetGOD(Dataset):
     def __getitem__(self, idx:int)->Tuple:
         meg_frame = self.meg_triggers[idx]
         baseline_frame = meg_frame - self.baseline_duration_frames
-        end_frame = meg_frame + self.meg_onset_frames + self.meg_durarion_frames
-
+        end_frame = meg_frame + self.meg_onset_frames + self.meg_duration_frames
         if self.on_memory:
             ROI_MEG_Data = self.ROI_MEG_Data[:, baseline_frame:end_frame] # ch x time
         else:
@@ -78,7 +76,7 @@ class SessionDatasetGOD(Dataset):
          # z-score -> baseline correction -> clamp
         ROI_MEG_Data = z_score_epoch(ROI_MEG_Data) # z-score by channel across time
         ROI_MEG_Data -= np.mean(ROI_MEG_Data[:, :self.baseline_duration_frames], axis=1)[:, np.newaxis] # baseline correction
-        ROI_MEG_Data = ROI_MEG_Data[:, self.meg_onset_frames:] # remove before onset
+        ROI_MEG_Data = ROI_MEG_Data[:, -self.meg_duration_frames:]# ROI_MEG_Data[:, self.meg_onset_frames:] # remove before onset
         if self.clamp is not None:
             ROI_MEG_Data = clamp_epoch(ROI_MEG_Data, *self.clamp)
 
@@ -103,7 +101,7 @@ class SessionDatasetGOD(Dataset):
         # CAR -> (src_reconst) -> bandpass filter -> resample
         # 前処理してh5ファイルにする
         MEG_Data:np.ndarray = self.get_meg_matlab_data(self.meg_path)
-        MEG_Data = car_epoch(MEG_Data) # common average reference by time
+        # MEG_Data = car_epoch(MEG_Data) # common average reference by time
         if not self.only_meg:
             self.image_names = self.get_image_name_list(self.image_id_path)
         roi_channels:np.ndarray = roi(self.dataset_config) # electrode id
@@ -114,6 +112,7 @@ class SessionDatasetGOD(Dataset):
         else:
             # -----MEG-----
             ROI_MEG_Data = MEG_Data[roi_channels, :]
+            ROI_MEG_Data = car_epoch(ROI_MEG_Data) # common average reference by time
             if self.preproc_config.src_reconstruction:
                 assert len(ROI_MEG_Data) == 160, 'get {}'.format(len(ROI_MEG_Data))
                 print('src reconstruction')
@@ -131,23 +130,29 @@ class SessionDatasetGOD(Dataset):
                 bandpass_filter_high = self.preproc_config.bandpass_filter[1]
                 ROI_MEG_Data = mne.filter.filter_data(ROI_MEG_Data, sfreq=self.meg_fs, l_freq=bandpass_filter_low, h_freq=bandpass_filter_high,)
                 print(f'band path filter: {bandpass_filter_low}-{bandpass_filter_high}')
-            if self.preproc_config.brain_resample_rate is not None:
+            if (self.preproc_config.brain_resample_rate is not None) or (self.preproc_config.brain_resample_rate<self.meg_fs):
                 ROI_MEG_Data = mne.filter.resample(ROI_MEG_Data, down=self.meg_fs / self.preproc_config.brain_resample_rate)
                 print('resample {} to {} Hz'.format(self.meg_fs, self.preproc_config.brain_resample_rate))
-
+        
         assert ROI_MEG_Data.shape[0] == len(roi_channels), 'ROI_MEG_Data.shape[0] = {}, len(roi_channels) = {}'.format(ROI_MEG_Data.shape[0], len(roi_channels))
         assert ROI_MEG_Data.ndim == 2, 'ROI_MEG_Data.ndim = {}'.format(ROI_MEG_Data.ndim)
 
+        ROI_MEG_Data = ROI_MEG_Data.astype(np.float32)
         if self.on_memory:
             self.ROI_MEG_Data = ROI_MEG_Data
         else:
-            with h5py.File(self.h5_file_name, "w") as h5:
-                h5.create_dataset("ROI_MEG_Data", data=ROI_MEG_Data)
-                print('save ROI_MEG_Data to {}'.format(self.h5_file_name))
+            if os.path.exists(self.h5_file_name) and not self.force_create_h5:
+                pass
+            else:
+                with h5py.File(self.h5_file_name, "w") as h5:
+                    h5.create_dataset("ROI_MEG_Data", data=ROI_MEG_Data)
+                    print('save ROI_MEG_Data to {}'.format(self.h5_file_name))
 
-        self.meg_triggers = self.get_meg_trigger(self.meg_trigger_path, self.decimation_rate) # [frame]
+        self.meg_triggers = self.get_meg_trigger(self.meg_trigger_path, self.decimation_rate, self.meg_fs) # [frame]
         self.meg_labels = self.get_meg_label(self.meg_label_path) # [frame]
         self.indices = np.arange(len(self.meg_triggers))[:self.num_image_limit]
+
+        self.num_electrodes = ROI_MEG_Data.shape[0]
 
 
 
@@ -162,8 +167,10 @@ class SessionDatasetGOD(Dataset):
         return data['vec_index'][0]
 
     @staticmethod
-    def get_meg_trigger(meg_trigger_path:str, decimation_rate:float)->np.ndarray:
-        trigger = scipy.io.loadmat(meg_trigger_path)
+    def get_meg_trigger(meg_trigger_path:str, decimation_rate:float, fs:float)->np.ndarray:
+        trigger = scipy.io.loadmat(meg_trigger_path) # [sec]
+        trigger = trigger['trigger'][0] # [sec]
+        trigger = trigger * fs
         trigger /= decimation_rate
         trigger = np.floor(trigger).astype(np.int)
         return trigger

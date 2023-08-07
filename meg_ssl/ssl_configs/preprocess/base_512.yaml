@@ -1,5 +1,5 @@
-meg_onset: 0.2 # 0.15
-meg_duration: 0.2 # 0.25
+meg_onset: 0.0 # 0.15
+meg_duration: 0.5 # 0.25  # 0.512 * 240 % 4(patch_size) == 0
 clamp: [-12, 12]
 bandpass_filter: [2, 120]
 brain_resample_rate: 240 # 240

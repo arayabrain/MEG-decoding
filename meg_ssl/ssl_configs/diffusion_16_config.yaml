@@ -1,8 +1,8 @@
 defaults:
 # ========model========
-    - model:  scmbm
+    - model:  scmbm_16
 # ========prerpocessing========
-    - preprocess:  base
+    - preprocess:  dream_diffusion
 # ========dataset========
 dataset_name:
     train:
@@ -19,7 +19,7 @@ total_limit:
         GOD: 1200 # total number of samples across sessions
 
 # ========path========
-h5_root: ../../../dataset/ssl_dataset/test
+h5_root: ../../../dataset/ssl_dataset/diffusion
 resume_path: null
 
 # ========training========
@@ -37,6 +37,6 @@ training:
     accum_iter: 1
     mask_ratio: 0.75
     
-    logdir: '../../results_ssl/test/log'
-    ckpt_dir: '../../results_ssl/test/ckpt'
-    reconst_fig_dir: '../../results_ssl/test/reconst_fig2'
+    logdir: '../../results_ssl/diffusion16/log'
+    ckpt_dir: '../../results_ssl/diffusion16/ckpt'
+    reconst_fig_dir: '../../results_ssl/diffusion16/reconst_fig'

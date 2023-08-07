@@ -3,7 +3,7 @@ from typing import List, Optional
 
 import cv2
 import numpy as np
-import numpy.typing as npt
+# import numpy.typing as npt
 
 
 class VideoController(object):
@@ -19,11 +19,13 @@ class VideoController(object):
         """
         self.movie_path = movie_path
         if self.movie_path != 0 and not os.path.exists(movie_path):
+            print('while loading {}, following eception occurs.'.format(self.movie_path))
             raise FileNotFoundError("camera or video cannot be not opened.")
 
         self.video_capture = cv2.VideoCapture(movie_path)
 
         if not self.video_capture.isOpened():
+            print('while loading {}, following eception occurs.'.format(self.movie_path))
             raise ValueError("camera or video cannot be not opened.")
 
         self._frame_num = self.video_capture.get(cv2.CAP_PROP_FRAME_COUNT)
@@ -41,7 +43,7 @@ class VideoController(object):
     def current_frame(self) -> float:
         return self.video_capture.get(cv2.CAP_PROP_POS_FRAMES)
 
-    def get_current_image(self) -> npt.NDArray[np.uint8]:
+    def get_current_image(self) :#-> npt.NDArray[np.uint8]:
         """get image at current index of video.
 
         Raises:
@@ -55,7 +57,7 @@ class VideoController(object):
             raise ValueError("cannot read frame.")
         return frame
 
-    def get_image_at(self, frame_idx: int) -> npt.NDArray[np.uint8]:
+    def get_image_at(self, frame_idx: int) :# -> npt.NDArray[np.uint8]:
         """get image at designated frame index.
 
         Args:
@@ -73,7 +75,7 @@ class VideoController(object):
         self.video_capture.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
         return self.get_current_image()
 
-    def get_random_image(self) -> npt.NDArray[np.uint8]:
+    def get_random_image(self) :#-> npt.NDArray[np.uint8]:
         frame_idx = np.random.random_integers(0, int(self.frame_num) - 1)
         return self.get_image_at(frame_idx=frame_idx)
 

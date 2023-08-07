@@ -30,6 +30,8 @@ data/movies/
 # Run outputs and temp files
 outputs/
 tmp/
+tmps/*.h5
+tmps/*.png
 runs/
 wandb/
 python/

@@ -39,9 +39,7 @@ class MAEforEEG(nn.Module):
         # --------------------------------------------------------------------------
         # MAE encoder specifics
         self.patch_embed = PatchEmbed1D(time_len, patch_size, in_chans, embed_dim)
-
         num_patches = int(time_len / patch_size)
-
         self.num_patches = num_patches
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.pos_embed = nn.Parameter(torch.zeros(1, num_patches + 1, embed_dim), requires_grad=False)  # fixed sin-cos embedding
@@ -142,7 +140,7 @@ class MAEforEEG(nn.Module):
         x: [N, chan * 4, T/4]
         """
         p = self.patch_embed.patch_size
-        assert imgs.ndim == 3 and imgs.shape[1] % p == 0
+        assert imgs.ndim == 3 and imgs.shape[1] % p == 0, 'ndim: {}, chan: {}, p: {}'.format(imgs.ndim, imgs.shape[1], p)
 
         # h = imgs.shape[2] // p
         x = imgs.reshape(shape=(imgs.shape[0], imgs.shape[1] // p, -1))
@@ -304,12 +302,13 @@ class MAEforEEG(nn.Module):
     def forward(self, imgs, img_features=None, valid_idx=None, mask_ratio=0.75):
         # latent = self.forward_encoder(imgs, mask_ratio)
         latent, mask, ids_restore = self.forward_encoder(imgs, mask_ratio)
-            # print(x)
+        # print(x)
         # print(latent.shape)
-        # # print(mask)
+        # print(mask)
         # print(mask.shape)
-        # # print(ids_restore)
+        # print(ids_restore)
         # print(ids_restore.shape)
+        # import pdb; pdb.set_trace()
 
         pred = self.forward_decoder(latent, ids_restore)  # [N, L, p]
         # pred = self.forward_decoder(latent)  # [N, L, p]

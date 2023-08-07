@@ -1,7 +1,7 @@
 name: sc_mbm
 parameters:
   time_len: null # depends on preprocess
-  patch_size: 4
+  patch_size: 16
   embed_dim: 1024 #
   decoder_embed_dim: 512 #
   in_chans: null

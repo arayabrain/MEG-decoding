@@ -10,16 +10,25 @@ import tqdm
 import matplotlib.pyplot as plt
 import os
 import datetime
+import random
 
 
 
 class Trainer(BaseSSLTrainer):
     def other_setup(self):
-        param_groups = optim_factory.add_weight_decay(self.model, self.config.weight_decay)
+        param_groups = optim_factory.param_groups_weight_decay(self.model, self.config.weight_decay) # optim_factory.add_weight_decay(self.model, self.config.weight_decay)
         self.optimizer = torch.optim.AdamW(param_groups, lr=self.config.lr, betas=(0.9, 0.95))
         print(self.optimizer)
         self.loss_scaler = NativeScalerWithGradNormCount()
+        os.makedirs(self.config.reconst_fig_dir, exist_ok=True)
 
+
+    def after_epoch(self, epoch:int, train_metrics:dict):
+        super().after_epoch(epoch, train_metrics)
+        if epoch % self.val_check_interval==0:
+            self.plot_recon_figures2(epoch, split='train')
+            self.plot_recon_figures2(epoch, split='val')
+            
 
     def train_one_epoch(self, epoch:int)->dict:
         self.model.train()
@@ -27,9 +36,9 @@ class Trainer(BaseSSLTrainer):
         epoch_corr = []
         with tqdm.tqdm(self.train_loader) as pbar:
             for step, batch in enumerate(pbar):
-                loss, corr = self.train_one_step(batch, epoch)
+                loss, corr = self.train_one_step(epoch, step, batch)
                 pbar.set_description("[Epoch {}] step={},loss={}, corr={}".format(
-                    epoch, step, np.mean(loss)), np.mean(corr))
+                    epoch, step, np.mean(loss), np.mean(corr)))
                 epoch_loss.append(loss)
                 epoch_corr.append(corr)
         return {'train_loss': np.mean(epoch_loss), 'train_corr':np.mean(epoch_corr)}
@@ -40,7 +49,6 @@ class Trainer(BaseSSLTrainer):
         if step % self.config.accum_iter == 0:
             ut.adjust_learning_rate(self.optimizer, step / len(self.train_loader) + epoch, self.config)
         samples = batch_eeg # data_dcit['eeg']
-
         img_features = None
         valid_idx = None
         samples = samples.to(self.device)
@@ -69,7 +77,7 @@ class Trainer(BaseSSLTrainer):
         pred = self.model.unpatchify(pred)
         cor = torch.mean(torch.tensor([torch.corrcoef(torch.cat([p[0].unsqueeze(0), s[0].unsqueeze(0)],axis=0))[0,1] for p, s in zip(pred, samples)])).item()
         self.optimizer.zero_grad()
-        return loss_value, cor.item()
+        return loss_value, cor
 
     def validation(self, epoch:int)->dict:
         self.model.eval()
@@ -80,6 +88,7 @@ class Trainer(BaseSSLTrainer):
                 loss, corr = self.val_one_step(step, batch)
                 val_loss.append(loss)
                 val_corr.append(corr)
+        print('val loss: {}, val_corr: {}'.format(np.mean(val_loss), np.mean(val_corr)))
         return {'val_loss': np.mean(val_loss), 'val_corr':np.mean(val_corr)}
 
     def val_one_step(self, step, batch)->float:
@@ -90,8 +99,6 @@ class Trainer(BaseSSLTrainer):
         valid_idx = None
         samples = samples.to(self.device)
         # img_features = img_features.to(device)
-
-        self.optimizer.zero_grad()
         with torch.cuda.amp.autocast(enabled=True):
             loss, pred, _ = self.model(samples, img_features, valid_idx=valid_idx, mask_ratio=self.config.mask_ratio)
 
@@ -103,44 +110,71 @@ class Trainer(BaseSSLTrainer):
             pred = self.original_model.unpatchify(pred)
         pred = self.model.unpatchify(pred)
         cor = torch.mean(torch.tensor([torch.corrcoef(torch.cat([p[0].unsqueeze(0), s[0].unsqueeze(0)],axis=0))[0,1] for p, s in zip(pred, samples)])).item()
-        return loss_value, cor.item()
+        
+        return loss_value, cor
 
     @torch.no_grad()
     def plot_recon_figures2(self, epoch:int=None, split:str='val'):
+        patch_size = self.model.patch_size
+        n_axis=5
         self.model.eval()
-        fig, axs = plt.subplots(5, 2, figsize=(20,15))
+        fig, axs = plt.subplots(n_axis, 2, figsize=(20,15))
         fig.tight_layout()
         axs[0,0].set_title('Ground-truth')
         # axs[0,1].set_title('Masked Ground-truth')
         dataloader = self.val_loader if split=='val' else self.train_loader
         axs[0,1].set_title('Reconstruction')
-        for ax in axs:
+        electrode_ids = np.arange(0,20, int(20/n_axis))
+        reconstruct_sample_ids = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45] if dataloader.batch_size > 45 else np.arange(dataloader.batch_size)
+        for i, ax in enumerate(axs):
+            ei = electrode_ids[i]
             sample = next(iter(dataloader))
+            sample_id = reconstruct_sample_ids[i]
             sample = sample.to(self.device)
-            _, pred, mask = self.model(sample, mask_ratio=self.config.mask_ratio)
+            with torch.cuda.amp.autocast(enabled=True):
+                _, pred, mask = self.model(sample, None, valid_idx=None, mask_ratio=self.config.mask_ratio)
             # sample_with_mask = model_without_ddp.patchify(sample.transpose(1,2))[0].to('cpu').numpy().reshape(-1, model_without_ddp.patch_size)
-            sample_with_mask = sample.to('cpu').squeeze(0)[0].numpy().reshape(-1, model_without_ddp.patch_size)
+            sample_with_mask = sample.to('cpu').squeeze(0)[sample_id].numpy().reshape(-1, self.model.patch_size)
             # pred = model_without_ddp.unpatchify(pred.transpose(1,2)).to('cpu').squeeze(0)[0].unsqueeze(0).numpy()
             # sample = sample.to('cpu').squeeze(0)[0].unsqueeze(0).numpy()
+            
             if self.device_count > 1:
-                pred = self.original_model.unpatchify(pred).to('cpu').squeeze(0)[0].numpy()
+                pred = self.original_model.unpatchify(pred).to('cpu').squeeze(0)[sample_id].numpy()
+            else:
+                pred = self.model.unpatchify(pred).to('cpu').squeeze(0)[sample_id].numpy()
+            sample = sample.to('cpu')
             # pred = model_without_ddp.unpatchify(model_without_ddp.patchify(sample.transpose(1,2))).to('cpu').squeeze(0)[0].numpy()
-            sample = sample.to('cpu').squeeze(0)[0].numpy()
-            cor = np.corrcoef([pred, sample])[0,1]
+            sample = sample.to('cpu').squeeze(0)[sample_id].numpy()
+            mask = mask.to('cpu').squeeze(0)[sample_id].numpy()
+            mask_start = np.where(mask)[0] * patch_size
+            mask_end = np.where(mask)[0] * patch_size + patch_size
+            unpatched_mask = np.zeros([1,len(mask)*patch_size]).squeeze()
+            # import pdb; pdb.set_trace()
+            for s,e in zip(mask_start, mask_end):
+                unpatched_mask[s:e] = 1
+            
+            cor = np.corrcoef([pred[ei], sample[ei]])[0,1]
 
             x_axis = np.arange(0, sample.shape[-1])
             # groundtruth
-            ax[0].plot(x_axis, sample)
+            # import pdb; pdb.set_trace()
+            # ax[0].plot(x_axis[np.where(unpatched_mask==0)], sample[ei, np.where(unpatched_mask==0)[0]],'m-')
+            ax[0].plot(x_axis, sample[ei], 'm-')
+            for s, e in zip(mask_start, mask_end):
+                ax[0].plot(x_axis[s:e], sample[ei, s:e], 'k-')
+            # ax[0].plot(x_axis, sample_with_mask.reshape(*sample.shape)[0], color='r')
 
-            ax[1].plot(x_axis, pred)
+            ax[1].plot(x_axis, pred[ei])
+            for s, e in zip(mask_start, mask_end):
+                ax[1].plot(x_axis[s:e], pred[ei, s:e], 'k-')
             ax[1].set_ylabel('cor: %.4f'%cor, weight = 'bold')
             ax[1].yaxis.set_label_position("right")
         fig_name = 'reconst-%s'%(datetime.datetime.now().strftime("%d-%m-%Y-%H-%M-%S"))
         if epoch is not None:
-            fig_name = '{}epoch-{}'.format(epoch, fig_name)
-        fig.savefig(os.path.join(self.config.reconst_fig_dir, f'{fig_name}.png'))
-        if self.logger is not None:
-            self.logger.log_image('reconst', fig)
+            fig_name = '{}epoch-{}-{}'.format(epoch, split, fig_name)
+        reconstruct_image_path =os.path.join(self.config.reconst_fig_dir, f'{fig_name}.png')
+        fig.savefig(reconstruct_image_path)
+        print(f'{epoch} Epoch: save reconstruct image to ', reconstruct_image_path)
         plt.close(fig)
 
 

@@ -1,3 +1,4 @@
+name: GOD
 # =====Path settings======
 kernel_root: /work/project/MEG_GOD/GOD_dataset
 ch_region_path: './data/GOD/ch_region.json'
