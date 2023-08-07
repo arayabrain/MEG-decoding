@@ -75,46 +75,51 @@ ID05_SuitsVol1-1_id5_MEG_DATAPixx_part5.mp4         ID10_GhostInTheShellVol1-1_i
 
 ### コマンド履歴
 
-`python train_ssl.py --config test_config  --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt`  
-`python train_ssl.py --config diffusion_config  --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt`  
-`python train_ssl.py --config diffusion_16_config  --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt`  
+`python train_ssl.py --config test_config  --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt`
+`python train_ssl.py --config diffusion_config  --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt`
+`python train_ssl.py --config diffusion_16_config  --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt`
 #### sbj01-all (31138 trials)
-`train_ssl.py --config sbj1_all --model scmbm --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200 --h5name vc-fs1000-dura200-1 --wandbkey /home/yainoue/wandb_inoue.txt`  
+`train_ssl.py --config sbj1_all --model scmbm --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200 --h5name vc-fs1000-dura200-1 --wandbkey /home/yainoue/wandb_inoue.txt`
 
-`python train_ssl.py --config sbj1_all --model scmbm --preprocess fs1000_dura500 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_4-fs1000-dura500 --h5name vc-fs1000-dura200-2`     
+`python train_ssl.py --config sbj1_all --model scmbm --preprocess fs1000_dura500 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_4-fs1000-dura500 --h5name vc-fs1000-dura200-2`
 
-`python train_ssl.py --config sbj1_all --model scmbm_16 --preprocess fs1000_dura200 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_16-fs1000-dura200 --h5name vc-fs1000-dura200-3`   
+`python train_ssl.py --config sbj1_all --model scmbm_16 --preprocess fs1000_dura200 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_16-fs1000-dura200 --h5name vc-fs1000-dura200-3`
 #### sbj01-10k
 
-`python train_ssl.py --config sbj1_10k --model scmbm --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200-10k --h5name vc-fs1000-dura200-1 --wandbkey /home/yainoue/wandb_inoue.txt`  
+`python train_ssl.py --config sbj1_10k --model scmbm --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200-10k --h5name vc-fs1000-dura200-1 --wandbkey /home/yainoue/wandb_inoue.txt`
 
-`python train_ssl.py --config sbj1_10k --model scmbm --preprocess fs1000_dura500 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_4-fs1000-dura500-10k --h5name vc-fs1000-dura200-2`     
+`python train_ssl.py --config sbj1_10k --model scmbm --preprocess fs1000_dura500 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_4-fs1000-dura500-10k --h5name vc-fs1000-dura200-2`
 
-`python train_ssl.py --config sbj1_10k --model scmbm_16 --preprocess fs1000_dura200 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_16-fs1000-dura200-10k --h5name vc-fs1000-dura200-3`     
+`python train_ssl.py --config sbj1_10k --model scmbm_16 --preprocess fs1000_dura200 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_16-fs1000-dura200-10k --h5name vc-fs1000-dura200-3`
 
 #### sbj01-5k
 
-`python train_ssl.py --config sbj1_5k --model scmbm --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200-5k --h5name vc-fs1000-dura200-1 --wandbkey /home/yainoue/wandb_inoue.txt`  
+`python train_ssl.py --config sbj1_5k --model scmbm --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200-5k --h5name vc-fs1000-dura200-1 --wandbkey /home/yainoue/wandb_inoue.txt`
 
-`python train_ssl.py --config sbj1_5k --model scmbm --preprocess fs1000_dura500 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_4-fs1000-dura500-5k --h5name vc-fs1000-dura200-2`     
+`python train_ssl.py --config sbj1_5k --model scmbm --preprocess fs1000_dura500 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_4-fs1000-dura500-5k --h5name vc-fs1000-dura200-2`
 
-`python train_ssl.py --config sbj1_5k --model scmbm_16 --preprocess fs1000_dura200 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_16-fs1000-dura200-5k --h5name vc-fs1000-dura200-3`     
+`python train_ssl.py --config sbj1_5k --model scmbm_16 --preprocess fs1000_dura200 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_16-fs1000-dura200-5k --h5name vc-fs1000-dura200-3`
 
 #### sbj01-1k
 
-`python train_ssl.py --config sbj1_1k --model scmbm --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200-1k --h5name vc-fs1000-dura200-1 --wandbkey /home/yainoue/wandb_inoue.txt`  
+`python train_ssl.py --config sbj1_1k --model scmbm --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200-1k --h5name vc-fs1000-dura200-1 --wandbkey /home/yainoue/wandb_inoue.txt`
 
-`python train_ssl.py --config sbj1_1k --model scmbm --preprocess fs1000_dura500 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_4-fs1000-dura500-1k --h5name vc-fs1000-dura200-2`     
+`python train_ssl.py --config sbj1_1k --model scmbm --preprocess fs1000_dura500 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_4-fs1000-dura500-1k --h5name vc-fs1000-dura200-2`
 
-`python train_ssl.py --config sbj1_1k --model scmbm_16 --preprocess fs1000_dura200 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_16-fs1000-dura200-1k --h5name vc-fs1000-dura200-3`   
+`python train_ssl.py --config sbj1_1k --model scmbm_16 --preprocess fs1000_dura200 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_16-fs1000-dura200-1k --h5name vc-fs1000-dura200-3`
 
 #### sbj01-2.5k
 
-`python train_ssl.py --config sbj1_2.5k --model scmbm --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200-2.5k --h5name vc-fs1000-dura200-1 --wandbkey /home/yainoue/wandb_inoue.txt`  
+`python train_ssl.py --config sbj1_2.5k --model scmbm --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200-2.5k --h5name vc-fs1000-dura200-1 --wandbkey /home/yainoue/wandb_inoue.txt`
 
-`python train_ssl.py --config sbj1_2.5k --model scmbm --preprocess fs1000_dura500 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_4-fs1000-dura500-2.5k --h5name vc-fs1000-dura200-2`     
+`python train_ssl.py --config sbj1_2.5k --model scmbm --preprocess fs1000_dura500 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_4-fs1000-dura500-2.5k --h5name vc-fs1000-dura200-2`
 
-`python train_ssl.py --config sbj1_2.5k --model scmbm_16 --preprocess fs1000_dura200 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_16-fs1000-dura200-2.5k --h5name vc-fs1000-dura200-3`   
+`python train_ssl.py --config sbj1_2.5k --model scmbm_16 --preprocess fs1000_dura200 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_16-fs1000-dura200-2.5k --h5name vc-fs1000-dura200-3`
+
+###　下位タスク(Alignment)
+####  sbj01-all (31138 trials)
+`python contrastive_learning.py --config sbj1_6k --meg_model scmbm --vision_model vit_clip --decode_model mlp --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200 --h5name vc-fs1000-dura200-1 --wandbkey /home/yainoue/wandb_inoue.txt`
+
 
 ### 実験計画
 #### 事前学習
@@ -140,8 +145,11 @@ ID05_SuitsVol1-1_id5_MEG_DATAPixx_part5.mp4         ID10_GhostInTheShellVol1-1_i
 
 #### 下位タスク
 1. Approach
-    * contrastive learning (cosine-similarity) 
+    * contrastive learning (cosine-similarity)
 2. fine-tuning 手法
     * freeze
     * LoRA
     * full-fine-tuning
+3. Label
+    * w/o labels of pretraining data
+    * w/ labels of pretraining data

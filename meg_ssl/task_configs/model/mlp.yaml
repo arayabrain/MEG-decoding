@@ -1,0 +1,8 @@
+name: mlp
+parameters:
+  input_features: null # depends on meg encoder
+  hidden_features: [512]
+  output_features: 512 # depends on image encoder
+  activation: relu
+  norm: layer
+  dropout: 0.5

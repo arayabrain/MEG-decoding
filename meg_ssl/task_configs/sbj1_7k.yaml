@@ -1,8 +1,17 @@
 # ========model========
-model:  scmbm
+meg_encoder:  scmbm
+image_encoder: vit_clip
+decoder: mapping
 # ========prerpocessing========
 preprocess: base
-            
+
+# ========fine-tuning========
+meg_encoder_finetune: none
+image_encoder_finetune: none
+
+# ========RoLA=========
+# TODO: add RoLA config
+
 # ========dataset========
 dataset_name:
     train:
@@ -22,9 +31,11 @@ total_limit:
 # ========path========
 h5_root: ../../../dataset/ssl_dataset/{h5_name}
 resume_path: null
+meg_encoder_path: '../../results_ssl/{exp_name}/ckpt/best.pth' #
+image_encoder_path: null # null is allowed
 
 # ========training========
-training: 
+training:
     precision: 16
     val_check_interval: 10
     num_workers: 4 # 4
@@ -34,10 +45,9 @@ training:
     weight_decay: 0.05
     num_epoch: 500
     warmup_epochs: 40
-    clip_grad: 0.8
+    # clip_grad: 0.8
     accum_iter: 1
-    mask_ratio: 0.75
-    
-    logdir: '../../results_task/{exp_name}/log'
-    ckpt_dir: '../../results_task/{exp_name}/ckpt'
-    reconst_fig_dir: '../../results_task/{exp_name}/reconst_fig'
+    # mask_ratio: 0.75
+
+    logdir: '../../results_task/god_6k/{exp_name}/log'
+    ckpt_dir: '../../results_task/god_6k/{exp_name}/ckpt'

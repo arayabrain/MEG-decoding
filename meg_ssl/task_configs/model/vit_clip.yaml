@@ -1,0 +1,3 @@
+name: vit_clip
+parameters:
+  path: openai/clip-vit-large-patch14
