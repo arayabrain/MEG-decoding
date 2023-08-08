@@ -195,7 +195,7 @@ class MAEforEEG(nn.Module):
 
         return x_masked, mask, ids_restore
 
-    def forward_encoder(self, x, mask_ratio):
+    def forward_encoder(self, x, mask_ratio, global_pool=False):
         # embed patches
         x = self.patch_embed(x)
 
@@ -217,6 +217,9 @@ class MAEforEEG(nn.Module):
         # apply Transformer blocks
         for blk in self.blocks:
             x = blk(x)
+
+        if global_pool:
+            x = x.mean(dim=1) # keepdim=True)
         x = self.norm(x)
 
         return x, mask, ids_restore

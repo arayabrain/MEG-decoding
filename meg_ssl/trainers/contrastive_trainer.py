@@ -16,9 +16,9 @@ from hydra import compose, initialize
 import torch.nn.functional as F
 from meg_decoding.utils.loss import CLIPLoss
 
-# def clip_loss(target_emb, image_embeds):
-#     loss = 1 - torch.cosine_similarity(target_emb, image_embeds, dim=-1).mean()
-#     return loss
+def cosin_sim(target_emb, image_embeds):
+    loss = 1 - torch.cosine_similarity(target_emb, image_embeds, dim=-1).mean()
+    return loss
 
 # def contrastive_loss(logits, dim):
 #     neg_ce = torch.diag(F.log_softmax(logits, dim=dim))
@@ -133,6 +133,8 @@ class AlignTrainer(BaseSSLTrainer):
             self.criterion = CLIPLoss(self.config.clip).train().to(self.device)
         elif self.config.criterion == 'MSE':
             self.criterion = torch.nn.MSELoss(reduction="mean")
+        elif self.config.criterion == 'cosin_sim':
+            self.criterion = cosin_sim
         else:
             raise ValueError('criterion should be clip or MSE')
         
@@ -203,9 +205,12 @@ class AlignTrainer(BaseSSLTrainer):
             batch_image = preprocessor(batch_image)
 
         with torch.cuda.amp.autocast(enabled=True):
-            latent, mask, ids_restore = self.meg_encoder.forward_encoder(samples, -1)
+            latent, mask, ids_restore = self.meg_encoder.forward_encoder(samples, -1, self.config.global_pool)
             assert mask is None
-            latent_wo_cls = latent[:, 1:, :] # torch.Size([100, 52, 1024])  208(time_len) / 4 (patch_size) = 52 (num_patch)
+            if latent.ndim ==3:
+                latent_wo_cls = latent[:, 1:, :] # torch.Size([100, 52, 1024])  208(time_len) / 4 (patch_size) = 52 (num_patch)
+            else: 
+                latent_wo_cls = latent
             pred = self.decoder(latent_wo_cls)
             # target
             # target = self.image_encoder(**batch_image)# .image_embeds
@@ -257,9 +262,12 @@ class AlignTrainer(BaseSSLTrainer):
         batch_image = batch_image.to(self.device)
 
         with torch.cuda.amp.autocast(enabled=True):
-            latent, mask, ids_restore = self.meg_encoder.forward_encoder(samples, -1)
+            latent, mask, ids_restore = self.meg_encoder.forward_encoder(samples, -1, self.config.global_pool)
             assert mask is None
-            latent_wo_cls = latent[:, 1:, :]
+            if latent.ndim ==3:
+                latent_wo_cls = latent[:, 1:, :] # torch.Size([100, 52, 1024])  208(time_len) / 4 (patch_size) = 52 (num_patch)
+            else: 
+                latent_wo_cls = latent
             pred = self.decoder(latent_wo_cls)
             # target
             # target = self.image_encoder(**batch_image)# .image_embeds

@@ -154,6 +154,9 @@ if __name__ == '__main__':
 
     # decoderのinput features は前段のモデルのパラメタに依存する & output featuresはimage encoderの埋め込み次元に依存する
     if cfg.decoder.name == 'mlp':
-        cfg.decoder.parameters.input_features = int(cfg.preprocess.meg_duration * cfg.preprocess.brain_resample_rate / cfg.meg_encoder.parameters.patch_size * cfg.meg_encoder.parameters.embed_dim) # time_len * resample_rate / patch_size * num_dim
+        if cfg.training.global_pool:
+            cfg.decoder.parameters.input_features = cfg.meg_encoder.parameters.embed_dim
+        else:
+            cfg.decoder.parameters.input_features = int(cfg.preprocess.meg_duration * cfg.preprocess.brain_resample_rate / cfg.meg_encoder.parameters.patch_size * cfg.meg_encoder.parameters.embed_dim) # time_len * resample_rate / patch_size * num_dim
         cfg.decoder.parameters.output_features =  512 # image_encoder.vision_embed_dim
     run(cfg, args.wandbkey, args.device_counts)

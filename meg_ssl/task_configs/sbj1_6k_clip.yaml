@@ -44,13 +44,13 @@ training:
     # mask_ratio: 0.75
     global_pool: False
 
-    logdir: '../../results_task/god_6k/{exp_name}/log'
-    ckpt_dir: '../../results_task/god_6k/{exp_name}/ckpt'
+    logdir: '../../results_task/god_6k_clip/{exp_name}/log'
+    ckpt_dir: '../../results_task/god_6k_clip/{exp_name}/ckpt'
     # ========fine-tuning========
     meg_encoder_finetune: none
     image_encoder_finetune: none
     # ========criterion========
-    criterion: MSE
+    criterion: clip
     # ========CLIP LOSS=======
     clip:
         reduction: 'mean'

@@ -42,15 +42,15 @@ training:
     # clip_grad: 0.8
     accum_iter: 1
     # mask_ratio: 0.75
-    global_pool: False
+    global_pool: True
 
-    logdir: '../../results_task/god_6k/{exp_name}/log'
-    ckpt_dir: '../../results_task/god_6k/{exp_name}/ckpt'
+    logdir: '../../results_task/god_6k_cossim_gp/{exp_name}/log'
+    ckpt_dir: '../../results_task/god_6k_cossim_gp/{exp_name}/ckpt'
     # ========fine-tuning========
     meg_encoder_finetune: none
     image_encoder_finetune: none
     # ========criterion========
-    criterion: MSE
+    criterion: cosin_sim
     # ========CLIP LOSS=======
     clip:
         reduction: 'mean'
