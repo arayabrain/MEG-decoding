@@ -118,7 +118,7 @@ ID05_SuitsVol1-1_id5_MEG_DATAPixx_part5.mp4         ID10_GhostInTheShellVol1-1_i
 
 ###　下位タスク(Alignment)
 ####  sbj01-all (31138 trials)
-`python contrastive_learning.py --config sbj1_6k --meg_model scmbm --vision_model vit_clip16 --decode_model mlp --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200 --h5name vc-fs1000-dura200-1 --wandbkey /home/yainoue/wandb_inoue.txt`  
+`python contrastive_learning.py --config sbj1_6k --meg_model scmbm --vision_model vit_clip16 --decode_model mlp --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200 --h5name vc-fs1000-dura200-1 --wandbkey /home/yainoue/wandb_inoue.txt`
 
 `python contrastive_learning.py --config sbj1_6k --meg_model scmbm --vision_model vit_clip16 --decode_model mlp --preprocess fs1000_dura500 --device_counts 1 --exp scmbm_4-fs1000-dura500 --h5name vc-fs1000-dura200-2 --wandbkey /home/yainoue/wandb_inoue.txt`  
 
@@ -162,6 +162,9 @@ clip
 #### 下位タスク
 1. Approach
     * contrastive learning (cosine-similarity)
+    * MSE
+    * cosin-sim
+    * latent-diffusion
 2. fine-tuning 手法
     * freeze
     * LoRA
@@ -169,3 +172,4 @@ clip
 3. Label
     * w/o labels of pretraining data
     * w/ labels of pretraining data
+
