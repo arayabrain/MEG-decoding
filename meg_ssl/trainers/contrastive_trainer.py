@@ -12,6 +12,7 @@ import tqdm
 import os
 from torch.utils.data import Dataset, DataLoader
 from peft import get_peft_config, get_peft_model, LoraConfig, TaskType
+from hydra import compose, initialize
 
 def clip_loss(target_emb, image_embeds):
     loss = 1 - torch.cosine_similarity(target_emb, image_embeds, dim=-1).mean()
@@ -19,6 +20,11 @@ def clip_loss(target_emb, image_embeds):
 
 
 class AlignTrainer(BaseSSLTrainer):
+    # @staticmethod
+    # def get_lora_config(lora_config_name='lora.yaml'):
+    #     with initialize(config_path='/Users/inoue/Desktop/RD/moonshot/MEG/codes/MEG-decoding/meg_ssl/task_configs/fine_tuning'):
+    #         cfg = compose(lora_config_name)
+    #     return cfg
 
     def other_setup(self):
         # scaler
@@ -27,28 +33,42 @@ class AlignTrainer(BaseSSLTrainer):
         self.optimizer = torch.optim.AdamW(self.decoder.parameters(), lr=self.config.lr, betas=(0.9, 0.95))
         # meg_encoder
         self.train_meg_encoder = False if self.config.meg_encoder_finetune == 'none' else True
-        if self.config.meg_encoder_finetune == 'rola': # use peft
-            # TODO: get peft model
-            # TODO:add params of meg_encoder to optimizer
-            raise NotImplementedError()
+        if self.config.meg_encoder_finetune == 'lora': # use peft
+            # get peft model
+            lora_config = self.config.lora_config# self.get_lora_config('lora.yaml')
+            self.meg_encoder = get_peft_model(self.meg_encoder, peft_config=LoraConfig(**lora_config))
+            print('========== meg_encoder is transformed by peft ==========')
+            self.meg_encoder.print_trainable_parameters()
+            print('========================================================')
+            # add params of meg_encoder to optimizer
+            self.optimizer.add_param_group({'params': self.meg_encoder.parameters(), 'lr':5e-5})
         elif self.config.meg_encoder_finetune == 'full': # full fine-tuning
-            # TODO:add params of meg_encoder to optimizer
-            raise NotImplementedError()
+            # add params of meg_encoder to optimizer
+            self.optimizer.add_param_group({'params': self.meg_encoder.parameters(), 'lr':5e-5})
+            print('========== meg_encoder is trainable (full fine-tune) ==========')
         elif self.config.meg_encoder_finetune == 'none': # no fine-tuning
+            print('========== meg_encoder is frozen ==========')
             pass
         else:
             raise ValueError('meg_encoder_finetune should be one of [rola, full, none]')
 
         # image_encoder
         self.train_image_encoder = False if self.config.image_encoder_finetune == 'none' else True
-        if self.config.image_encoder_finetune == 'rola': # use peft
-            # TODO: get peft model
-            # TODO:add params of image_encoder to optimizer
-            raise NotImplementedError()
+        if self.config.image_encoder_finetune == 'lora': # use peft
+             # get peft model
+            lora_config = self.config.lora_config# self.get_lora_config('lora.yaml')
+            self.image_encoder = get_peft_model(self.image_encoder, peft_config=LoraConfig(**lora_config))
+            print('========== image_encoder is transformed by peft ==========')
+            self.image_encoder.print_trainable_parameters()
+            print('========================================================')
+            # add params of image_encoder to optimizer
+            self.optimizer.add_param_group({'params': self.image_encoder.parameters(), 'lr':5e-5})
         elif self.config.image_encoder_finetune == 'full': # full fine-tuning
-            # TODO:add params of image_encoder to optimizer
-            raise NotImplementedError()
+            # add params of image_encoder to optimizer
+            self.optimizer.add_param_group({'params': self.image_encoder.parameters(), 'lr':5e-5})
+            print('========== image_encoder is trainable (full fine-tune) ==========')
         elif self.config.image_encoder_finetune == 'none': # no fine-tuning
+            print('========== image_encoder is frozen ==========')
             pass
         else:
             raise ValueError('image_encoder_finetune should be one of [rola, full, none]')

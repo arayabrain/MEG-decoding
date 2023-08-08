@@ -14,6 +14,7 @@ import wandb
 import numpy as np
 import functools
 import os
+from meg_ssl.utils.image_preprocess import numpy2image, transform2vit_image_only_inputs
 
 
 # get dataset
@@ -24,7 +25,7 @@ def get_dataset(cfg:OmegaConf):
     num_trial_limit:dict = cfg.total_limit
     preproc_config:OmegaConf = cfg.preprocess
     h5_root:str = cfg.h5_root
-    image_preprocs:list = []
+    image_preprocs:list = [numpy2image]
     meg_preprocs:list = []
     only_meg:bool = False # with image
     on_memory:bool = False
@@ -40,7 +41,7 @@ def get_model(config, usewandb, device_count):
     image_encoder, image_processor = get_image_encoder(config.image_encoder.name, config.image_encoder.parameters)
     decoder = get_decoder(config.decoder.name, config.decoder.parameters)
     # TODO:
-    image_processor_func = functools.partial(image_processor, device_count=device_count)
+
     return meg_encoder, image_encoder, image_processor, decoder
 
 def get_contrastive_trainer(config, device_count, usewandb):
@@ -78,7 +79,15 @@ def run(cfg:OmegaConf, wandb_key_path:str, device_counts:int):
     # model
     meg_encoder, image_encoder, image_processor, decoder = get_model_and_trainer(cfg, device_count=device_counts, usewandb=usewandb, only_model=True) # get_model(cfg, usewandb, device_counts)
     trainer = get_contrastive_trainer(cfg, device_counts, usewandb)
-    trainer.fit(meg_encoder, image_encoder, decoder, [image_processor], train_dataset, val_dataset,
+
+    # image preprocess function
+    def image_processor_func(inputs):
+        return image_processor(inputs['text'], inputs['image'], return_tensors="pt", padding=True)
+    image_processing_funcs = [
+        transform2vit_image_only_inputs,
+        image_processor_func
+    ]
+    trainer.fit(meg_encoder, image_encoder, decoder, image_processing_funcs, train_dataset, val_dataset,
             meg_encoder_ckpt_path=cfg.meg_encoder_path,
             image_encoder_ckpt_path=cfg.image_encoder_path,
             decoder_ckpt_path=cfg.resume_path)
