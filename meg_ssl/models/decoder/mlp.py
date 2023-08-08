@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 class MLPDecoder(nn.Module):
     def __init__(self, input_features:int,
-                 middle_features:list,
+                 hidden_features:list,
                  output_features:int,
                  activation='relu',
                  norm='layer',
@@ -13,7 +13,7 @@ class MLPDecoder(nn.Module):
         super(MLPDecoder, self).__init__()
 
         self.input_features = input_features
-        self.middle_features = middle_features
+        self.hidden_features = hidden_features
         self.output_features = output_features
 
         if activation == 'relu':
@@ -29,20 +29,20 @@ class MLPDecoder(nn.Module):
             raise ValueError(f'norm {norm} not supported')
 
         self.first_layer = nn.Sequential(
-            nn.Linear(self.input_features, self.middle_features[0]),
-            norm(self.middle_features[0]),
+            nn.Linear(self.input_features, self.hidden_features[0]),
+            norm(self.hidden_features[0]),
             activation(),
         )
         hidden_layer_list = []
-        for i in range(len(self.middle_features)-1):
+        for i in range(len(self.hidden_features)-1):
             hidden_layer_list.append(nn.Sequential(
-                nn.Linear(self.middle_features[i], self.middle_features[i+1]),
-                norm(self.middle_features[i+1]),
+                nn.Linear(self.hidden_features[i], self.hidden_features[i+1]),
+                norm(self.hidden_features[i+1]),
                 activation(),
                 nn.Dropout(dropout),
             ))
-        self.hidden_layer_list = self.nn.ModuleList(hidden_layer_list)
-        self.final_layer = nn.Linear(self.middle_features[-1], self.output_features)
+        self.hidden_layer_list = nn.ModuleList(hidden_layer_list)
+        self.final_layer = nn.Linear(self.hidden_features[-1], self.output_features)
 
     def forward(self, x):
         if x.dim() > 2:

@@ -9,6 +9,7 @@ RESULT_ROOT = '/home/yainoue/meg2image/results_ssl'
 
 VC_fs1000_bp2_120_dur208_patch4_dirs = {
     1000: 'scmbm_4-fs1000-dura200-1k',
+    2500: 'scmbm_4-fs1000-dura200-2.5k',
     5000: 'scmbm_4-fs1000-dura200-5k',
     10000: 'scmbm_4-fs1000-dura200-10k',
     31138: 'scmbm_4-fs1000-dura200',
@@ -17,6 +18,7 @@ VC_fs1000_bp2_120_dur208_patch4_dirs = {
 
 VC_fs1000_bp2_120_dur512_patch4_dirs = {
     1000: 'scmbm_4-fs1000-dura500-1k',
+    2500: 'scmbm_4-fs1000-dura500-2.5k',
     5000: 'scmbm_4-fs1000-dura500-5k',
     10000: 'scmbm_4-fs1000-dura500-10k',
     31138: 'scmbm_4-fs1000-dura500',
@@ -25,6 +27,7 @@ VC_fs1000_bp2_120_dur512_patch4_dirs = {
 
 VC_fs1000_bp2_120_dur208_patch16_dirs = {
     1000: 'scmbm_16-fs1000-dura200-1k',
+    2500:  'scmbm_16-fs1000-dura200-2.5k',
     5000: 'scmbm_16-fs1000-dura200-5k',
     10000: 'scmbm_16-fs1000-dura200-10k',
     31138: 'scmbm_16-fs1000-dura200',

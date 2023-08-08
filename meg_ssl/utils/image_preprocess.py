@@ -4,6 +4,10 @@ import torchvision.transforms as transforms
 from einops import rearrange
 from PIL import Image
 
+def transform2vit_image_only_inputs(batch_imgs:Image)->dict:
+    text_inputs = ['']*len(batch_imgs)
+    return {'images': batch_imgs, 'text': text_inputs}
+
 def numpy2image(img):
     return Image.fromarray(img)
 

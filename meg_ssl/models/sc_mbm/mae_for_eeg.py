@@ -204,7 +204,7 @@ class MAEforEEG(nn.Module):
         # print('encoder embed')
         # print(x.shape)
         # masking: length -> length * mask_ratio
-        if mask >= 0:
+        if mask_ratio >= 0:
             x, mask, ids_restore = self.random_masking(x, mask_ratio)
         else:
             mask = None

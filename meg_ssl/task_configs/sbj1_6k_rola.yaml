@@ -5,13 +5,6 @@ decoder: mapping
 # ========prerpocessing========
 preprocess: base
 
-# ========fine-tuning========
-meg_encoder_finetune: none
-image_encoder_finetune: none
-
-# ========RoLA=========
-# TODO: add RoLA config
-
 # ========dataset========
 dataset_name:
     train:
@@ -24,7 +17,8 @@ dataset_yaml:
     GOD: GOD/god_vc.yaml # god_config.yaml
 total_limit:
     train:
-        drama: 6000 # total number of samples across sessions about: 31200
+        GOD: 6000
+        # drama: 6000 # total number of samples across sessions about: 31200
     val:
         GOD: 1200 # total number of samples across sessions
 
@@ -51,3 +45,17 @@ training:
 
     logdir: '../../results_task/god_6k/{exp_name}/log'
     ckpt_dir: '../../results_task/god_6k/{exp_name}/ckpt'
+
+    # ========fine-tuning========
+    meg_encoder_finetune: lora
+    image_encoder_finetune: none
+    # ========RoLA=========
+    lora_config:
+        r: 2
+        lora_alpha: 2
+        target_modules:
+            - .query
+            - key
+            - value
+            - dense
+        lora_dropout: 0.01

@@ -9,8 +9,4 @@ target_modules:
   - key
   - value
   - dense
-  # - dense_h_to_4h
-  # - dense_4h_to_h
-  # for mosicml/mpt-7b
-  # - Wqkv
 lora_dropout: 0.01

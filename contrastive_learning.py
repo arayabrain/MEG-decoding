@@ -7,14 +7,15 @@ from meg_ssl.models import get_model_and_trainer
 from meg_ssl.models.image_encoder import get_image_encoder
 from meg_ssl.models.decoder import get_decoder
 from meg_ssl.utils import set_seed
-from meg_ssl.trainers.contrastive_trainer import ContrastiveTrainer
+from meg_ssl.trainers.contrastive_trainer import AlignTrainer
 
 from omegaconf import OmegaConf
 import wandb
 import numpy as np
 import functools
 import os
-
+from meg_ssl.utils.image_preprocess import numpy2image, transform2vit_image_only_inputs
+import torch
 
 # get dataset
 def get_dataset(cfg:OmegaConf):
@@ -24,7 +25,7 @@ def get_dataset(cfg:OmegaConf):
     num_trial_limit:dict = cfg.total_limit
     preproc_config:OmegaConf = cfg.preprocess
     h5_root:str = cfg.h5_root
-    image_preprocs:list = []
+    image_preprocs:list = []# [numpy2image]
     meg_preprocs:list = []
     only_meg:bool = False # with image
     on_memory:bool = False
@@ -35,17 +36,16 @@ def get_dataset(cfg:OmegaConf):
 
 
 # get model
-def get_model(config, usewandb, device_count):
+def get_model(config, device_count, usewandb):
     meg_encoder, _ = get_model_and_trainer(config, device_count=device_count, usewandb=usewandb, only_model=True)
     image_encoder, image_processor = get_image_encoder(config.image_encoder.name, config.image_encoder.parameters)
     decoder = get_decoder(config.decoder.name, config.decoder.parameters)
     # TODO:
-    image_processor_func = functools.partial(image_processor, device_count=device_count)
     return meg_encoder, image_encoder, image_processor, decoder
 
 def get_contrastive_trainer(config, device_count, usewandb):
     training_config = config.training
-    return ContrastiveTrainer(
+    return AlignTrainer(
         training_config, device_count, usewandb
     )
 
@@ -76,9 +76,22 @@ def run(cfg:OmegaConf, wandb_key_path:str, device_counts:int):
     print('num_electrodes: ', cfg.meg_encoder.parameters.in_chans)
     print('num trials: Train: {}, Val: {}'.format(len(train_dataset), len(val_dataset)))
     # model
-    meg_encoder, image_encoder, image_processor, decoder = get_model_and_trainer(cfg, device_count=device_counts, usewandb=usewandb, only_model=True) # get_model(cfg, usewandb, device_counts)
+    meg_encoder, image_encoder, image_processor, decoder = get_model(cfg, device_count=device_counts, usewandb=usewandb) # get_model(cfg, usewandb, device_counts)
     trainer = get_contrastive_trainer(cfg, device_counts, usewandb)
-    trainer.fit(meg_encoder, image_encoder, decoder, [image_processor], train_dataset, val_dataset,
+
+    def collate_fn(batch):
+        # create new batch
+        batch_meg = torch.stack([torch.from_numpy(b[0]) for b in batch])
+        # batch_image = [numpy2image(b[1]) for b in batch]
+        # batch_image = transform2vit_image_only_inputs(batch_image)
+        # batch_image = image_processor(batch_image['text'], batch_image['images'], return_tensors="pt", padding=True)
+        batch_image = torch.stack([image_processor(numpy2image(b[1])) for b in batch])
+        return batch_meg, batch_image
+    # image preprocess function
+    image_processing_funcs = []
+
+    trainer.fit(meg_encoder, image_encoder, decoder, image_processing_funcs, train_dataset, val_dataset,
+                collate_fn=collate_fn,
             meg_encoder_ckpt_path=cfg.meg_encoder_path,
             image_encoder_ckpt_path=cfg.image_encoder_path,
             decoder_ckpt_path=cfg.resume_path)
@@ -93,13 +106,14 @@ def parse_args():
     parser.add_argument('--config', type=str, default='ssl/ssl_configs/test_config.yaml')
     parser.add_argument('--meg_model', type=str, default=None)
     parser.add_argument('--vision_model', type=str, default='vit_clip')
-    parser.add_argument('--decode_model', type='str', default='mlp')
+    parser.add_argument('--decode_model', type=str, default='mlp')
     parser.add_argument('--preprocess', type=str, default=None)
     parser.add_argument('--pretrained_ckpt', type=str, default=None)
     parser.add_argument('--wandbkey', type=str, default=None) # default='/home/yainoue/wandb_inoue.txt')
     parser.add_argument('--device_counts', type=int, default=1)
     parser.add_argument('--exp', type=str, default=None)
     parser.add_argument('--h5name', type=str, default=None)
+    parser.add_argument('--resume', type=str, default=None)
     parser.add_argument('--seed', type=int, default=42)
 
     args = parser.parse_args()
@@ -110,11 +124,11 @@ def parse_args():
 if __name__ == '__main__':
     args = parse_args()
     set_seed(args.seed)
-    with initialize(config_path='meg_ssl/ssl_configs/'):
+    with initialize(config_path='meg_ssl/task_configs/'):
         cfg = compose(args.config)
     with initialize(config_path='meg_ssl/ssl_configs/model'):
         cfg.meg_encoder = compose(args.meg_model)
-    print('INFO ========= model config is overrided by ', args.model)
+    print('INFO ========= model config is overrided by ', args.meg_model)
     with initialize(config_path='meg_ssl/ssl_configs/preprocess'):
         cfg.preprocess = compose(args.preprocess)
     print('INFO ========= preprocess config is overrided by', args.preprocess)
@@ -122,8 +136,8 @@ if __name__ == '__main__':
         cfg.image_encoder = compose(args.vision_model)
     print('INFO ========= image_encoder config is overrided by', args.vision_model)
     with initialize(config_path='meg_ssl/task_configs/model'):
-        cfg.decoder = compose(args.decoder)
-    print('INFO ========= decoder config is overrided by', args.decoder)
+        cfg.decoder = compose(args.decode_model)
+    print('INFO ========= decoder config is overrided by', args.decode_model)
 
     # num_electrodes, fs, bpがh5ファイルに関係している
     if args.h5name is None:
@@ -134,8 +148,12 @@ if __name__ == '__main__':
         args.exp = args.config
     cfg.training.logdir = cfg.training.logdir.format(exp_name=args.exp)
     cfg.training.ckpt_dir = cfg.training.ckpt_dir.format(exp_name=args.exp)
-    cfg.training.reconst_fig_dir = cfg.training.reconst_fig_dir.format(exp_name=args.exp)
 
     cfg.resume_path = args.resume
     cfg.meg_encoder_path = cfg.meg_encoder_path.format(exp_name=args.exp)
+
+    # decoderのinput features は前段のモデルのパラメタに依存する & output featuresはimage encoderの埋め込み次元に依存する
+    if cfg.decoder.name == 'mlp':
+        cfg.decoder.parameters.input_features = int(cfg.preprocess.meg_duration * cfg.preprocess.brain_resample_rate / cfg.meg_encoder.parameters.patch_size * cfg.meg_encoder.parameters.embed_dim) # time_len * resample_rate / patch_size * num_dim
+        cfg.decoder.parameters.output_features =  512 # image_encoder.vision_embed_dim
     run(cfg, args.wandbkey, args.device_counts)
