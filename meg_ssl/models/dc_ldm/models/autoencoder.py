@@ -5,10 +5,10 @@ from contextlib import contextmanager
 import numpy as np
 # from taming.modules.vqvae.quantize import VectorQuantizer2 as VectorQuantizer
 import torch.nn as nn
-from dc_ldm.modules.diffusionmodules.model import Encoder, Decoder
-from dc_ldm.modules.distributions.distributions import DiagonalGaussianDistribution
-from dc_ldm.modules.ema import LitEma
-from dc_ldm.util import instantiate_from_config
+from meg_ssl.models.dc_ldm.modules.diffusionmodules.model import Encoder, Decoder
+from meg_ssl.models.dc_ldm.modules.distributions.distributions import DiagonalGaussianDistribution
+from meg_ssl.models.dc_ldm.modules.ema import LitEma
+from meg_ssl.models.dc_ldm.util import instantiate_from_config
 from packaging import version
 from torch.optim.lr_scheduler import LambdaLR
 from torch import einsum

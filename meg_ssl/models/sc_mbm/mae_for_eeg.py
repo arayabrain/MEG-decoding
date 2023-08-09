@@ -429,9 +429,9 @@ class eeg_encoder(nn.Module):
         return
 
 class classify_network(nn.Module):
-    def __init__(self):
+    def __init__(self, in_chans=128):
         super().__init__()
-        self.maxpool = nn.Conv1d(128, 1, 1, stride=1)#nn.AdaptiveAvgPool1d((1))
+        self.maxpool = nn.Conv1d(in_chans, 1, 1, stride=1)#nn.AdaptiveAvgPool1d((1))
         self.fc = nn.Linear(1024, 40)
 
     def forward(self, x):
@@ -442,9 +442,9 @@ class classify_network(nn.Module):
 
 
 class mapping(nn.Module):
-    def __init__(self):
+    def __init__(self, in_chans=128):
         super().__init__()
-        self.maxpool = nn.Conv1d(128, 1, 1, stride=1)#nn.AdaptiveAvgPool1d((1))
+        self.maxpool = nn.Conv1d(in_chans, 1, 1, stride=1)#nn.AdaptiveAvgPool1d((1))
         self.fc = nn.Linear(1024, 768)
 
     def forward(self, x):

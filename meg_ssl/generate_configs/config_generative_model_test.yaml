@@ -9,9 +9,9 @@ preprocess: base
 dataset_name:
     train:
         # drama: sbj_1-session_all # all 1_3, 1~3
-        GOD: sbj_1-train-session_1_2_3_4_5_7_8_9_10_11
+        GOD: sbj_1-train-session_1 # _2_3_4_5_7_8_9_10_11
     val:
-        GOD: sbj_1-train-session_6_12
+        GOD: sbj_1-train-session_6 # _12
 dataset_yaml:
     # drama: drama/drama_vc.yaml # drama_config.yaml # region 160 ch
     GOD: GOD/god_vc.yaml # god_config.yaml
@@ -55,8 +55,8 @@ training:
     model_meta: null
     checkpoint_path: null
 
-    logdir: '../../results_task/dream_diffusion/{exp_name}/log'
-    ckpt_dir: '../../results_task/dream_diffusion/{exp_name}/ckpt'
+    logdir: '../../results_task/dream_diffusion_test/{exp_name}/log'
+    ckpt_dir: '../../results_task/dream_diffusion_test/{exp_name}/ckpt'
     # ========fine-tuning========
     meg_encoder_finetune: none
     image_encoder_finetune: none
@@ -68,6 +68,6 @@ training:
         init_temperature: 5.1
 
 
-root_path: '../../results_task/dream_diffusion/'
-output_path: '../../results_task/dream_diffusion/{exp_name}/'
+root_path: '../../results_task/dream_diffusion_test/'
+output_path: '../../results_task/dream_diffusion_test/{exp_name}/'
 

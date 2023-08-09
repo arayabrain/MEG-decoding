@@ -116,7 +116,7 @@ def fmri_transform(x, sparse_rate=0.2):
     x_aug[idx] = 0
     return torch.FloatTensor(x_aug)
 
-def main(config):
+def main(config, args):
     # project setup
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     torch.manual_seed(config.seed)
@@ -147,26 +147,27 @@ def main(config):
         # prepare pretrained mbm
 
         pretrain_mbm_metafile = torch.load(config.pretrain_mbm_path, map_location='cpu')
+        collate_fn = None
 
     elif config.dataset == 'MEG':
         from hydra import compose, initialize
         from meg_ssl.dataclass import parse_dataset
         # TODO: read config and get dataset
-        with initialize(config_path='meg_ssl/ssl_configs/'):
-            meg_cfg = compose(config.meg_config)
-        if config.model is not None:
+        with initialize(config_path='meg_ssl/generate_configs/'):
+            meg_cfg = compose(args.meg_config)
+        if args.meg_encoder is not None:
             with initialize(config_path='meg_ssl/ssl_configs/model'):
-                meg_cfg.model = compose(config.meg_encoder)
-            print('INFO ========= model config is overrided by ', config.meg_encoder)
-        if config.meg_preprocess is not None:
+                meg_cfg.meg_encoder = compose(args.meg_encoder)
+            print('INFO ========= model config is overrided by ', args.meg_encoder)
+        if args.meg_preprocess is not None:
             with initialize(config_path='meg_ssl/ssl_configs/preprocess'):
-                meg_cfg.preprocess = compose(config.meg_preprocess)
-            print('INFO ========= preprocess config is overrided by', config.meg_preprocess)
+                meg_cfg.preprocess = compose(args.meg_preprocess)
+            print('INFO ========= preprocess config is overrided by', args.meg_preprocess)
         # num_electrodes, fs, bpがh5ファイルに関係している
-        if config.meg_h5name is None:
+        if args.meg_h5name is None:
             meg_cfg.h5_root = meg_cfg.h5_root.format(h5_name='fs{}-bp{}_{}'.format(meg_cfg.preprocess.brain_resample_rate, *meg_cfg.preprocess.bandpass_filter))
         else:
-            meg_cfg.h5_root = meg_cfg.h5_root.format(h5_name=config.meg_h5name)
+            meg_cfg.h5_root = meg_cfg.h5_root.format(h5_name=args.meg_h5name)
 
         def get_dataset(cfg):
             dataset_names:dict = cfg.dataset_name
@@ -175,9 +176,9 @@ def main(config):
             num_trial_limit:dict = cfg.total_limit
             preproc_config = cfg.preprocess
             h5_root:str = cfg.h5_root
-            image_preprocs:list = [img_transform_train, img_transform_test]
+            image_preprocs:list = []
             meg_preprocs:list = []
-            only_meg:bool = True
+            only_meg:bool = False
             on_memory:bool = False
             dataset_dict:dict = parse_dataset(dataset_names, dataset_yamls, preproc_config, num_trial_limit,
                                             h5_root, image_preprocs, meg_preprocs, only_meg, on_memory)
@@ -185,12 +186,39 @@ def main(config):
             return dataset_dict['train'], dataset_dict['val']
         eeg_latents_dataset_train, eeg_latents_dataset_test = get_dataset(meg_cfg)
         # eeg_latents_dataset_train, eeg_latents_dataset_test = create_EEG_dataset_viz( image_transform=[img_transform_train, img_transform_test])
-        num_voxels = eeg_latents_dataset_train.data_len
-        meg_encoder_pretrained_path = os.path.join(meg_cfg.training.ckpt_dir.format(exp_name=config.meg_exp), 'best.pth')
+        num_voxels = int(meg_cfg.preprocess.meg_duration * meg_cfg.preprocess.brain_resample_rate) # eeg_latents_dataset_train.datasets[0].num_electrodes
+        meg_encoder_pretrained_path = os.path.join(meg_cfg.meg_encoder_path.format(exp_name=args.meg_exp))
+        meg_cfg.meg_encoder.parameters.in_chans = eeg_latents_dataset_test.datasets[0].num_electrodes
         pretrain_mbm_metafile = {
             'model':torch.load(meg_encoder_pretrained_path),
-            'config': meg_cfg.model.parameters
+            'config': meg_cfg.meg_encoder.parameters
         }
+        # img_transform_train, img_transform_test
+        from transformers import AutoProcessor
+        from meg_ssl.utils.image_preprocess import numpy2image
+        vit_processor = AutoProcessor.from_pretrained("openai/clip-vit-large-patch14")
+        def train_collate_fn(batch):
+            new_batch = {}
+            image_raw = [numpy2image(b[1]) for b in batch]
+            image_raw = vit_processor(images=image_raw, return_tensors="pt")
+            image_raw['pixel_values'] = image_raw['pixel_values'].squeeze(0)
+            new_batch['image_raw'] = image_raw
+            new_batch['image'] = torch.stack([img_transform_train(b[1]/255.0) for b in batch])
+            new_batch['eeg'] = torch.stack([torch.from_numpy(b[0]) for b in batch])
+            new_batch['label'] = torch.empty(len(new_batch['image']), 1) # dummy
+            
+            return new_batch
+        def test_collate_fn(batch):
+            new_batch = {}
+            image_raw = [numpy2image(b[1]) for b in batch]
+            image_raw = vit_processor(images=image_raw, return_tensors="pt")
+            image_raw['pixel_values'] = image_raw['pixel_values'].squeeze(0)
+            new_batch['image_raw'] = image_raw
+            new_batch['image'] = torch.stack([img_transform_test(b[1]/255.0) for b in batch])
+            new_batch['eeg'] = torch.stack([torch.from_numpy(b[0]) for b in batch])
+            new_batch['label'] = torch.empty(len(new_batch['image']), 1) # dummy
+            
+            return new_batch
 
     else:
         raise NotImplementedError
@@ -214,7 +242,7 @@ def main(config):
     # finetune the model
     trainer = create_trainer(config.num_epoch, config.precision, config.accumulate_grad, config.logger, check_val_every_n_epoch=2)
     generative_model.finetune(trainer, eeg_latents_dataset_train, eeg_latents_dataset_test,
-                config.batch_size, config.lr, config.output_path, config=config)
+                config.batch_size, config.lr, config.output_path, config=config, collate_fn=[train_collate_fn, test_collate_fn])
 
     # generate images
     # generate limited train images and generate images for subjects seperately
@@ -300,4 +328,4 @@ if __name__ == '__main__':
 
     # logger = WandbLogger()
     config.logger = None # logger
-    main(config)
+    main(config, args)

@@ -10,7 +10,7 @@ import torch.nn.functional as F
 import torch
 
 
-from dc_ldm.modules.diffusionmodules.util import (
+from meg_ssl.models.dc_ldm.modules.diffusionmodules.util import (
     checkpoint,
     conv_nd,
     linear,
@@ -19,7 +19,7 @@ from dc_ldm.modules.diffusionmodules.util import (
     normalization,
     timestep_embedding,
 )
-from dc_ldm.modules.attention import SpatialTransformer
+from meg_ssl.models.dc_ldm.modules.attention import SpatialTransformer
 
 
 # dummy replace

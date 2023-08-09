@@ -16,24 +16,24 @@ from contextlib import contextmanager
 from functools import partial
 from tqdm import tqdm
 from torchvision.utils import make_grid
-from pytorch_lightning.utilities.distributed import rank_zero_only
-
-from dc_ldm.util import log_txt_as_img, exists, default, ismap, isimage, mean_flat, count_params, instantiate_from_config
-from dc_ldm.modules.ema import LitEma
-from dc_ldm.modules.distributions.distributions import normal_kl, DiagonalGaussianDistribution
-from dc_ldm.models.autoencoder import VQModelInterface, IdentityFirstStage, AutoencoderKL
-from dc_ldm.modules.diffusionmodules.util import make_beta_schedule, extract_into_tensor, noise_like
-from dc_ldm.models.diffusion.ddim import DDIMSampler
-from dc_ldm.models.diffusion.plms import PLMSSampler
+# from pytorch_lightning.utilities.distributed import rank_zero_only
+from pytorch_lightning.utilities.rank_zero import rank_zero_only
+from meg_ssl.models.dc_ldm.util import log_txt_as_img, exists, default, ismap, isimage, mean_flat, count_params, instantiate_from_config
+from meg_ssl.models.dc_ldm.modules.ema import LitEma
+from meg_ssl.models.dc_ldm.modules.distributions.distributions import normal_kl, DiagonalGaussianDistribution
+from meg_ssl.models.dc_ldm.models.autoencoder import VQModelInterface, IdentityFirstStage, AutoencoderKL
+from meg_ssl.models.dc_ldm.modules.diffusionmodules.util import make_beta_schedule, extract_into_tensor, noise_like
+from meg_ssl.models.dc_ldm.models.diffusion.ddim import DDIMSampler
+from meg_ssl.models.dc_ldm.models.diffusion.plms import PLMSSampler
 from PIL import Image
 import torch.nn.functional as F
-from eval_metrics import get_similarity_metric
+from meg_ssl.utils.diffusion_utils.eval_metrics import get_similarity_metric
 
 __conditioning_keys__ = {'concat': 'c_concat',
                          'crossattn': 'c_crossattn',
                          'adm': 'y'}
 
-from dc_ldm.modules.encoders.modules import FrozenImageEmbedder
+from meg_ssl.models.dc_ldm.modules.encoders.modules import FrozenImageEmbedder
 def disabled_train(self, mode=True):
     """Overwrite model.train with this function to make sure train/eval mode
     does not change anymore."""
@@ -116,7 +116,6 @@ class DDPM(pl.LightningModule):
         self.logvar = torch.full(fill_value=logvar_init, size=(self.num_timesteps,))
         if self.learn_logvar:
             self.logvar = nn.Parameter(self.logvar, requires_grad=True)
-
         self.validation_count = 0
         self.ddim_steps = ddim_steps
         self.return_cond = False
@@ -629,7 +628,7 @@ class LatentDiffusion(DDPM):
 
     @rank_zero_only
     @torch.no_grad()
-    def on_train_batch_start(self, batch, batch_idx, dataloader_idx):
+    def on_train_batch_start(self, batch, batch_idx):
         # only for very first batch
         if self.scale_by_std and self.current_epoch == 0 and self.global_step == 0 and batch_idx == 0 and not self.restarted_from_ckpt:
             assert self.scale_factor == 1., 'rather not use custom rescaling and std-rescaling simultaneously'
@@ -1180,7 +1179,8 @@ class LatentDiffusion(DDPM):
         loss_simple = self.get_loss(model_output, target, mean=False).mean([1, 2, 3])
         loss_dict.update({f'{prefix}/loss_simple': loss_simple.mean()})
 
-        logvar_t = self.logvar[t].to(self.device)
+        self.logvar = self.logvar.to(self.device)
+        logvar_t = self.logvar[t]
         loss = loss_simple / torch.exp(logvar_t) + logvar_t
         # loss = loss_simple / torch.exp(self.logvar) + self.logvar
         if self.learn_logvar:

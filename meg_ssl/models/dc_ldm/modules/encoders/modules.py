@@ -7,7 +7,7 @@ import sys
 sys.path.append('../dreamdiffusion/code/')
 from einops import rearrange, repeat
 from transformers import CLIPTokenizer, CLIPTextModel, AutoProcessor, CLIPVisionModel, CLIPVisionModelWithProjection
-from dc_ldm.modules.x_transformer import Encoder, TransformerWrapper  # TODO: can we directly rely on lucidrains code and simply add this as a reuirement? --> test
+from meg_ssl.models.dc_ldm.modules.x_transformer import Encoder, TransformerWrapper  # TODO: can we directly rely on lucidrains code and simply add this as a reuirement? --> test
 import kornia
 
 class AbstractEncoder(nn.Module):
@@ -262,7 +262,7 @@ class FrozenClipImageEmbedder(nn.Module):
 
 
 if __name__ == "__main__":
-    # from dc_ldm.util import count_params
+    # from meg_ssl.models.dc_ldm.util import count_params
     # text_model = FrozenCLIPEmbedder()
     # text = ['a dog']
     # text_out = text_model(text)

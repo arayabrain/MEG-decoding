@@ -55,6 +55,7 @@ class AlignTrainer(BaseSSLTrainer):
         if self.config.meg_encoder_finetune == 'lora': # use peft
             # get peft model
             lora_config = self.config.lora_config# self.get_lora_config('lora.yaml')
+            # import pdb; pdb.set_trace()
             self.meg_encoder = get_peft_model(self.meg_encoder, peft_config=LoraConfig(**lora_config))
             print('========== meg_encoder is transformed by peft ==========')
             self.meg_encoder.print_trainable_parameters()
@@ -138,7 +139,7 @@ class AlignTrainer(BaseSSLTrainer):
         else:
             raise ValueError('criterion should be clip or MSE')
         
-        self.other_setup()
+        
         
         if meg_encoder_ckpt_path is not None:
             if 'peft' in meg_encoder_ckpt_path:
@@ -163,9 +164,15 @@ class AlignTrainer(BaseSSLTrainer):
         if decoder_ckpt_path is not None:
             self.decoder.load_state_dict(torch.load(decoder_ckpt_path))
             print('decoder load from ', decoder_ckpt_path)
+
+        self.other_setup()
+
+        
         self.meg_encoder = self.meg_encoder.to(self.device).eval()
         self.image_encoder = self.image_encoder.to(self.device).eval()
         self.decoder = self.decoder.to(self.device).eval()
+
+        
 
     def train_one_epoch(self, epoch:int)->dict:
         self.decoder.train()

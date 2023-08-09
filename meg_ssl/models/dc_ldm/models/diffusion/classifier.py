@@ -10,8 +10,8 @@ from einops import rearrange
 from glob import glob
 from natsort import natsorted
 
-from dc_ldm.modules.diffusionmodules.openaimodel import EncoderUNetModel, UNetModel
-from dc_ldm.util import log_txt_as_img, default, ismap, instantiate_from_config
+from meg_ssl.models.dc_ldm.modules.diffusionmodules.openaimodel import EncoderUNetModel, UNetModel
+from meg_ssl.models.dc_ldm.util import log_txt_as_img, default, ismap, instantiate_from_config
 
 __models__ = {
     'class_label': EncoderUNetModel,

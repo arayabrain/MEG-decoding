@@ -30,44 +30,40 @@ image_encoder_path: null # null is allowed
 
 # ========training========
 training:
+    precision: 16
     val_check_interval: 10
     num_workers: 4 # 4
-    batch_size: 5
-    lr: 5.3e-5
+    batch_size: 50
+    lr: 2.5e-4
     min_lr: 0
     weight_decay: 0.05
     num_epoch: 500
     warmup_epochs: 40
     # clip_grad: 0.8
     accum_iter: 1
-    # ========dream diffusion========
-    precision: 32
-    accumulate_grad: 1
-    crop_ratio: 0.2
-    global_pool: False
-    use_time_cond: True
-    clip_tune: True #False
-    cls_tune: False
-    eval_avg: True
-    num_samples: 5
-    ddim_steps: 250
-    HW: null
-    model_meta: null
-    checkpoint_path: null
+    # mask_ratio: 0.75
+    global_pool: True
 
-    logdir: '../../results_task/dream_diffusion/{exp_name}/log'
-    ckpt_dir: '../../results_task/dream_diffusion/{exp_name}/ckpt'
+    logdir: '../../results_task/god_6k_cossim_gp_lora/{exp_name}/log'
+    ckpt_dir: '../../results_task/god_6k_cossim_gp_lora/{exp_name}/ckpt'
     # ========fine-tuning========
-    meg_encoder_finetune: none
+    meg_encoder_finetune: lora
     image_encoder_finetune: none
+    # ========RoLA=========
+    lora_config:
+        r: 8
+        lora_alpha: 2
+        target_modules:
+            - qkv
+            - fc1
+            - fc2
+            # - proj
+        lora_dropout: 0.01
+
     # ========criterion========
-    criterion: MSE
+    criterion: cosin_sim
     # ========CLIP LOSS=======
     clip:
         reduction: 'mean'
         init_temperature: 5.1
-
-
-root_path: '../../results_task/dream_diffusion/'
-output_path: '../../results_task/dream_diffusion/{exp_name}/'
 

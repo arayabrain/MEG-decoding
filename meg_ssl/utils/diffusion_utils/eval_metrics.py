@@ -116,7 +116,7 @@ def n_way_top_k_acc(pred, class_id, n_way, num_trials=40, top_k=1):
     for t in range(num_trials):
         idxs_picked = np.random.choice(pick_range, n_way-1, replace=False)
         pred_picked = torch.cat([pred[class_id].unsqueeze(0), pred[idxs_picked]])
-        acc = accuracy(pred_picked.unsqueeze(0), torch.tensor([0], device=pred.device), 
+        acc = accuracy(pred_picked.unsqueeze(0), torch.tensor([0], device=pred.device), 'multiclass', num_classes=n_way, 
                     top_k=top_k)
         acc_list.append(acc.item())
     return np.mean(acc_list), np.std(acc_list)

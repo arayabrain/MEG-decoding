@@ -10,11 +10,11 @@ from einops import rearrange, repeat
 from torchvision.utils import make_grid
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
-from sc_mbm.mae_for_eeg import eeg_encoder, classify_network, mapping
+from meg_ssl.models.sc_mbm.mae_for_eeg import eeg_encoder, classify_network, mapping
 from PIL import Image
 
 def create_model_from_config(config, num_voxels, global_pool):
-    model = eeg_encoder(time_len=num_voxels, patch_size=config.patch_size, embed_dim=config.embed_dim,
+    model = eeg_encoder(time_len=num_voxels, patch_size=config.patch_size, embed_dim=config.embed_dim, in_chans=config.in_chans,
                 depth=config.depth, num_heads=config.num_heads, mlp_ratio=config.mlp_ratio, global_pool=global_pool)
     return model
 
@@ -38,10 +38,11 @@ class cond_stage_model(nn.Module):
         else:
             model = eeg_encoder(time_len=num_voxels, global_pool=global_pool)
         self.mae = model
+        num_patch = int(num_voxels / metafile['config']['patch_size'])
         if clip_tune:
-            self.mapping = mapping()
+            self.mapping = mapping(num_patch)
         if cls_tune:
-            self.cls_net = classify_network()
+            self.cls_net = classify_network(num_patch)
 
         self.fmri_seq_len = model.num_patches
         self.fmri_latent_dim = model.embed_dim
@@ -94,7 +95,7 @@ class cond_stage_model(nn.Module):
 class eLDM:
 
     def __init__(self, metafile, num_voxels, device=torch.device('cpu'),
-                 pretrain_root='../pretrains/',
+                 pretrain_root='/home/yainoue/meg2image/codes/dreamdiffusion/pretrains',
                  logger=None, ddim_steps=250, global_pool=True, use_time_cond=False, clip_tune = True, cls_tune = False):
         # self.ckp_path = os.path.join(pretrain_root, 'model.ckpt')
         self.ckp_path = os.path.join(pretrain_root, 'models/v1-5-pruned.ckpt')
@@ -134,7 +135,7 @@ class eLDM:
         self.metafile = metafile
 
     def finetune(self, trainers, dataset, test_dataset, bs1, lr1,
-                output_path, config=None):
+                output_path, config=None, collate_fn=None):
         config.trainer = None
         config.logger = None
         self.model.main_config = config
@@ -145,8 +146,14 @@ class eLDM:
 
         # # stage one: only optimize conditional encoders
         print('\n##### Stage One: only optimize conditional encoders #####')
-        dataloader = DataLoader(dataset, batch_size=bs1, shuffle=True)
-        test_loader = DataLoader(test_dataset, batch_size=bs1, shuffle=False)
+        if collate_fn is None:
+            dataloader = DataLoader(dataset, batch_size=bs1, shuffle=True, num_workers=4)
+            test_loader = DataLoader(test_dataset, batch_size=bs1, shuffle=False, num_workers=4)
+        elif isinstance(collate_fn, list):
+            dataloader = DataLoader(dataset, batch_size=bs1, shuffle=True, collate_fn=collate_fn[0], num_workers=4)
+            test_loader = DataLoader(test_dataset, batch_size=bs1, shuffle=False, collate_fn=collate_fn[1], num_workers=4)
+        else:
+            raise ValueError()
         self.model.unfreeze_whole_model()
         self.model.freeze_first_stage()
         # self.model.freeze_whole_model()
