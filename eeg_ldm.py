@@ -168,6 +168,36 @@ def main(config, args):
             meg_cfg.h5_root = meg_cfg.h5_root.format(h5_name='fs{}-bp{}_{}'.format(meg_cfg.preprocess.brain_resample_rate, *meg_cfg.preprocess.bandpass_filter))
         else:
             meg_cfg.h5_root = meg_cfg.h5_root.format(h5_name=args.meg_h5name)
+        from transformers import AutoProcessor
+        from meg_ssl.utils.image_preprocess import numpy2image
+        vit_processor = AutoProcessor.from_pretrained("openai/clip-vit-large-patch14")
+        class DiffusionDataset():
+            def __init__(self, dataset, split='train'):
+                self.dataset = dataset
+                if split=='train':
+                    self.img_transform = img_transform_train
+                else:
+                    self.img_transform = img_transform_test
+                self.vit_processor = AutoProcessor.from_pretrained("openai/clip-vit-large-patch14")
+                
+            def __len__(self):
+                return len(self.dataset)
+            @property
+            def datasets(self):
+                return self.dataset.datasets
+            
+            def __getitem__(self, idx):
+                ret = {}
+                eeg, image = self.dataset[idx]
+                image_raw = numpy2image(image)
+                image_raw = self.vit_processor(images=image_raw, return_tensors="pt")
+                image_raw['pixel_values'] = image_raw['pixel_values'].squeeze(0)
+                ret['image_raw'] = image_raw
+                ret['image'] = self.img_transform(image.astype(np.float32)/255.0)
+                ret['eeg'] = torch.from_numpy(eeg)
+                ret['label'] = 0 # dummy
+                
+                return ret
 
         def get_dataset(cfg):
             dataset_names:dict = cfg.dataset_name
@@ -183,7 +213,7 @@ def main(config, args):
             dataset_dict:dict = parse_dataset(dataset_names, dataset_yamls, preproc_config, num_trial_limit,
                                             h5_root, image_preprocs, meg_preprocs, only_meg, on_memory)
 
-            return dataset_dict['train'], dataset_dict['val']
+            return DiffusionDataset(dataset_dict['train'], 'train'), DiffusionDataset(dataset_dict['val'], 'val')
         eeg_latents_dataset_train, eeg_latents_dataset_test = get_dataset(meg_cfg)
         # eeg_latents_dataset_train, eeg_latents_dataset_test = create_EEG_dataset_viz( image_transform=[img_transform_train, img_transform_test])
         num_voxels = int(meg_cfg.preprocess.meg_duration * meg_cfg.preprocess.brain_resample_rate) # eeg_latents_dataset_train.datasets[0].num_electrodes
@@ -194,9 +224,7 @@ def main(config, args):
             'config': meg_cfg.meg_encoder.parameters
         }
         # img_transform_train, img_transform_test
-        from transformers import AutoProcessor
-        from meg_ssl.utils.image_preprocess import numpy2image
-        vit_processor = AutoProcessor.from_pretrained("openai/clip-vit-large-patch14")
+        
         def train_collate_fn(batch):
             new_batch = {}
             image_raw = [numpy2image(b[1]) for b in batch]
@@ -242,11 +270,11 @@ def main(config, args):
     # finetune the model
     trainer = create_trainer(config.num_epoch, config.precision, config.accumulate_grad, config.logger, check_val_every_n_epoch=2)
     generative_model.finetune(trainer, eeg_latents_dataset_train, eeg_latents_dataset_test,
-                config.batch_size, config.lr, config.output_path, config=config, collate_fn=[train_collate_fn, test_collate_fn])
+                config.batch_size, config.lr, config.output_path, config=config, collate_fn=None)
 
     # generate images
     # generate limited train images and generate images for subjects seperately
-    generate_images(generative_model, eeg_latents_dataset_train, eeg_latents_dataset_test, config)
+    # generate_images(generative_model, eeg_latents_dataset_train, eeg_latents_dataset_test, config)
 
     return
 
@@ -304,7 +332,7 @@ def create_trainer(num_epoch, precision=32, accumulate_grad_batches=2,logger=Non
     acc = 'gpu' if torch.cuda.is_available() else 'cpu'
     return pl.Trainer(accelerator=acc, max_epochs=num_epoch, logger=logger,
             precision=precision, accumulate_grad_batches=accumulate_grad_batches,
-            enable_checkpointing=False, enable_model_summary=False, gradient_clip_val=0.5,
+            enable_checkpointing=False, enable_model_summary=False, # gradient_clip_val=0.5, # remove by inoue
             check_val_every_n_epoch=check_val_every_n_epoch)
 
 if __name__ == '__main__':

@@ -353,6 +353,9 @@ class DDPM(pl.LightningModule):
     def shared_step(self, batch):
         x = self.get_input(batch, self.first_stage_key)
         loss, loss_dict = self(x)
+        # for name, parameter in self.named_parameters():
+        #     if parameter.require_grad:
+        #         print(name, parameter.requires_grad)
         return loss, loss_dict
 
     def training_step(self, batch, batch_idx):
@@ -367,7 +370,7 @@ class DDPM(pl.LightningModule):
         if self.use_scheduler:
             lr = self.optimizers().param_groups[0]['lr']
             self.log('lr_abs', lr, prog_bar=True, logger=True, on_step=False, on_epoch=True)
-
+        
         return loss
 
     
@@ -440,7 +443,7 @@ class DDPM(pl.LightningModule):
                     img = rearrange(img, 'c h w -> h w c')
                     Image.fromarray(img).save(os.path.join(self.output_path, 'val', 
                                     f'{self.validation_count}_{suffix}', f'test{sp_idx}-{copy_idx}.png'))
-                                    
+                    print('saved rendered image to ', os.path.join(self.output_path, 'val', f'{self.validation_count}_{suffix}', f'test{sp_idx}-{copy_idx}.png'))               
     def full_validation(self, batch, state=None):
         print('###### run full validation! ######\n')
         grid, all_samples, state = self.generate(batch, ddim_steps=self.ddim_steps, num_samples=5, limit=None, state=state)
@@ -620,6 +623,8 @@ class LatentDiffusion(DDPM):
         if self.clip_tune:
             self.image_embedder = FrozenImageEmbedder()
         self.cls_tune = False
+
+        self.automatic_optimization = False # added by inoue
 
     def make_cond_schedule(self, ):
         self.cond_ids = torch.full(size=(self.num_timesteps,), fill_value=self.num_timesteps - 1, dtype=torch.long)
@@ -1024,6 +1029,9 @@ class LatentDiffusion(DDPM):
         return self.first_stage_model.encode(x)
 
     def shared_step(self, batch, **kwargs):
+        opt = self.optimizers()
+        opt.zero_grad()
+
         self.freeze_first_stage()
         # print('share step\'s get input')
         x, c, label, image_raw = self.get_input(batch, self.first_stage_key)
@@ -1032,12 +1040,63 @@ class LatentDiffusion(DDPM):
         # print(x.shape)
         # print('c.shape')
         # print(c.shape)
+        # import pdb; pdb.set_trace()
+        # for name, parameter in self.named_parameters():
+        #     if parameter.requires_grad:
+        #         print(name, parameter.requires_grad)
+        # cnt = 0
+        # for name, parameter in self.named_parameters():
+        #     if parameter.requires_grad:
+        #         print(name, parameter.sum())
+        #         cnt += 1
+        #         if cnt ==3:
+        #             break
+        # self.debug_params()
+
         if self.return_cond:
-            loss, cc = self(x, c, label, image_raw)
+            loss, cc = self(x, c, label, image_raw) # loss, loss_dict, cc
+            # print('DEBUG: loss', loss)
+            # I dont know why, but it does not update parameters
+            # print(loss)
+            import pdb; pdb.set_trace()
+            total_loss = loss[0]
+            self.manual_backward(total_loss)
+            opt.step()
+            self.debug_params()
+            
             return loss, cc
         else:    
-            loss = self(x, c, label, image_raw)
+            loss = self(x, c, label, image_raw) # loss, loss_dict
+            # print('DEBUG: loss', loss)
+            # I dont know why, but it does not update parameters
+            # print(loss)
+            # import pdb; pdb.set_trace()
+            total_loss = loss[0]
+            self.manual_backward(total_loss)
+            opt.step()
+            # self.debug_params()
             return loss
+        
+    def debug_params(self, cnt_limit=3):
+        cnt = 0
+        for name, parameter in self.named_parameters():
+            if parameter.requires_grad:
+                if parameter.grad is not None:
+                    print(name, parameter.sum(), parameter.grad.sum())
+                else:
+                    print(name, parameter.sum(), 'None')
+                cnt += 1
+                if cnt ==cnt_limit:
+                    break
+        cnt = 0
+        for param in self.optimizers().param_groups[0]['params']:
+            if param.grad is not None:
+                print(name, param.sum(), param.grad.sum())
+            else:
+                print(name, param.sum(), 'None')
+            cnt += 1
+            if cnt ==cnt_limit:
+                break
 
     def forward(self, x, c, label, image_raw, *args, **kwargs):
         # print(self.num_timesteps)
@@ -1529,7 +1588,6 @@ class LatentDiffusion(DDPM):
             if self.learn_logvar:
                 print('Diffusion model optimizing logvar')
                 params.append(self.logvar)
-
         opt = torch.optim.AdamW(params, lr=lr)
 
         if self.use_scheduler:

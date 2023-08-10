@@ -41,7 +41,7 @@ def get_log_file(dirname:str):
         if os.path.isfile(os.path.join(dirname, f)):
             filelist.append(f)
     print(dirname, '\n', filelist)
-    assert len(filelist) == 1
+    # assert len(filelist) == 1, '{} has more than one log file'.format(dirname)
 
     return os.path.join(RESULT_ROOT, dirname, filelist[-1])
 

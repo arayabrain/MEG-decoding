@@ -68,7 +68,7 @@ class Config_EEG_finetune(Config_MBM_finetune):
 
 
         # Training Parameters
-        self.lr = 5.3e-5
+        self.lr = 1000 #5.3e-5
         self.weight_decay = 0.05
         self.num_epoch = 15
         self.batch_size = 16 if self.dataset == 'GOD' else 4 
@@ -112,7 +112,7 @@ class Config_Generative_Model:
         np.random.seed(self.seed)
         # finetune parameters
         self.batch_size = 5 if self.dataset == 'GOD' else 25
-        self.lr = 5.3e-5
+        self.lr = 1 # 5.3e-5
         self.num_epoch = 500
         
         self.precision = 32
@@ -126,7 +126,7 @@ class Config_Generative_Model:
         self.eval_avg = True
 
         # diffusion sampling parameters
-        self.num_samples = 5
+        self.num_samples = 2
         self.ddim_steps = 250
         self.HW = None
         # resume check util
