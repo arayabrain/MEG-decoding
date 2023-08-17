@@ -76,7 +76,9 @@ ID05_SuitsVol1-1_id5_MEG_DATAPixx_part5.mp4         ID10_GhostInTheShellVol1-1_i
 ### コマンド履歴
 
 `python train_ssl.py --config test_config  --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt`
+
 `python train_ssl.py --config diffusion_config  --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt`
+
 `python train_ssl.py --config diffusion_16_config  --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt`
 #### sbj01-all (31138 trials)
 `train_ssl.py --config sbj1_all --model scmbm --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200 --h5name vc-fs1000-dura200-1 --wandbkey /home/yainoue/wandb_inoue.txt`
@@ -120,20 +122,20 @@ ID05_SuitsVol1-1_id5_MEG_DATAPixx_part5.mp4         ID10_GhostInTheShellVol1-1_i
 ####  sbj01-all (31138 trials)
 `python contrastive_learning.py --config sbj1_6k --meg_model scmbm --vision_model vit_clip16 --decode_model mlp --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200 --h5name vc-fs1000-dura200-1 --wandbkey /home/yainoue/wandb_inoue.txt`
 
-`python contrastive_learning.py --config sbj1_6k --meg_model scmbm --vision_model vit_clip16 --decode_model mlp --preprocess fs1000_dura500 --device_counts 1 --exp scmbm_4-fs1000-dura500 --h5name vc-fs1000-dura200-2 --wandbkey /home/yainoue/wandb_inoue.txt`  
+`python contrastive_learning.py --config sbj1_6k --meg_model scmbm --vision_model vit_clip16 --decode_model mlp --preprocess fs1000_dura500 --device_counts 1 --exp scmbm_4-fs1000-dura500 --h5name vc-fs1000-dura200-2 --wandbkey /home/yainoue/wandb_inoue.txt`
 
-`python contrastive_learning.py --config sbj1_6k --meg_model scmbm_16 --vision_model vit_clip16 --decode_model mlp --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_16-fs1000-dura200 --h5name vc-fs1000-dura200-3 --wandbkey /home/yainoue/wandb_inoue.txt`  
-==============================================  
+`python contrastive_learning.py --config sbj1_6k --meg_model scmbm_16 --vision_model vit_clip16 --decode_model mlp --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_16-fs1000-dura200 --h5name vc-fs1000-dura200-3 --wandbkey /home/yainoue/wandb_inoue.txt`
+==============================================
 cossim
-`python contrastive_learning.py --config sbj1_6k_cos_sim --meg_model scmbm --vision_model vit_clip16 --decode_model mlp --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200 --h5name vc-fs1000-dura200-1 --wandbkey /home/yainoue/wandb_inoue.txt`  
+`python contrastive_learning.py --config sbj1_6k_cos_sim --meg_model scmbm --vision_model vit_clip16 --decode_model mlp --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200 --h5name vc-fs1000-dura200-1 --wandbkey /home/yainoue/wandb_inoue.txt`
 cossim-global pool
-`python contrastive_learning.py --config sbj1_6k_cos_sim_gp --meg_model scmbm --vision_model vit_clip16 --decode_model mlp --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200 --h5name vc-fs1000-dura200-2 --wandbkey /home/yainoue/wandb_inoue.txt`  
+`python contrastive_learning.py --config sbj1_6k_cos_sim_gp --meg_model scmbm --vision_model vit_clip16 --decode_model mlp --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200 --h5name vc-fs1000-dura200-2 --wandbkey /home/yainoue/wandb_inoue.txt`
 clip
-`python contrastive_learning.py --config sbj1_6k_clip --meg_model scmbm --vision_model vit_clip16 --decode_model mlp --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200 --h5name vc-fs1000-dura200-3 --wandbkey /home/yainoue/wandb_inoue.txt`  
+`python contrastive_learning.py --config sbj1_6k_clip --meg_model scmbm --vision_model vit_clip16 --decode_model mlp --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200 --h5name vc-fs1000-dura200-3 --wandbkey /home/yainoue/wandb_inoue.txt`
 cossim-global pool lora
-`python contrastive_learning.py --config sbj1_6k_cos_sim_gp_lora --meg_model scmbm --vision_model vit_clip16 --decode_model mlp --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200 --h5name vc-fs1000-dura200-2 --wandbkey /home/yainoue/wandb_inoue.txt` 
+`python contrastive_learning.py --config sbj1_6k_cos_sim_gp_lora --meg_model scmbm --vision_model vit_clip16 --decode_model mlp --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200 --h5name vc-fs1000-dura200-2 --wandbkey /home/yainoue/wandb_inoue.txt`
 
-# TODO  
+# TODO
 `python contrastive_learning.py --config sbj1_6k_cos_sim --meg_model scmbm --vision_model vit_clip16 --decode_model mlp --preprocess fs1000_dura500 --device_counts 1 --exp scmbm_4-fs1000-dura500 --h5name vc-fs1000-dura200-2 --wandbkey /home/yainoue/wandb_inoue.txt`
 
 `python contrastive_learning.py --config sbj1_6k_cos_sim --meg_model scmbm_16 --vision_model vit_clip16 --decode_model mlp --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_16-fs1000-dura200 --h5name vc-fs1000-dura200-3 --wandbkey /home/yainoue/wandb_inoue.txt`
@@ -143,7 +145,7 @@ cossim-global pool lora
 `python eeg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config config_generative_model --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200 --meg_h5name vc-fs1000-dura200-1`
 
 python eeg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config config_generative_model --meg_encode
-r scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200 --meg_h5name vc-fs1000-dura200-1 
+r scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200 --meg_h5name vc-fs1000-dura200-1
 
 ### 実験計画
 #### 事前学習
