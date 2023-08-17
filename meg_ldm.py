@@ -21,7 +21,7 @@ from hydra import compose, initialize
 from meg_ssl.dataclass import parse_dataset
 from transformers import AutoProcessor
 from meg_ssl.utils.image_preprocess import numpy2image
-from meg_ssl.trainers import DiffusionTrainer
+from meg_ssl.trainers.diffusion_trainer import DiffusionTrainer
 # vit_processor = AutoProcessor.from_pretrained("openai/clip-vit-large-patch14")
 
 
@@ -84,7 +84,7 @@ def get_args_parser():
     parser.add_argument('--meg_preprocess', type=str, default=None)
     parser.add_argument('--meg_exp', type=str, default=None)
     parser.add_argument('--meg_h5name', type=str, default=None)
-    parser.add_argument('--wandb_key_path', type='str', default=None)
+    parser.add_argument('--wandb_key_path', type=str, default=None)
     parser.add_argument('--device_counts', type=int, default=1)
     parser.add_argument('--ldf_exp', type=str, default='test')
 
