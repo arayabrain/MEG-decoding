@@ -152,12 +152,12 @@ def get_dataset(cfg):
     on_memory:bool = False
     dataset_dict:dict = parse_dataset(dataset_names, dataset_yamls, preproc_config, num_trial_limit,
                                     h5_root, image_preprocs, meg_preprocs, only_meg, on_memory)
-    crop_pix = int(cfg.crop_ratio*cfg.img_size)
+    crop_pix = int(cfg.training.crop_ratio*cfg.training.img_size)
     img_transform_train = transforms.Compose([
         normalize,
 
         transforms.Resize((512, 512)),
-        random_crop(cfg.img_size-crop_pix, p=0.5),
+        random_crop(cfg.training.img_size-crop_pix, p=0.5),
 
         transforms.Resize((512, 512)),
         channel_last
