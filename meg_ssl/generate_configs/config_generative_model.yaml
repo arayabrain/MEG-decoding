@@ -27,6 +27,7 @@ h5_root: ../../../dataset/ssl_dataset/{h5_name}
 resume_path: null
 meg_encoder_path: '../../results_ssl/{exp_name}/ckpt/best.pth' #
 image_encoder_path: null # null is allowed
+pretrain_gm_path: ../dreamdiffusion
 
 # ========training========
 training:
