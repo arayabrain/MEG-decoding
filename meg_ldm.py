@@ -102,7 +102,7 @@ def update_config(args, config, exp_name):
     config.logdir = config.logdir.format(exp_name=exp_name)
     config.ckpt_dir = config.ckpt_dir.format(exp_name=exp_name)
     config.reconst_dir = config.reconst_dir.format(exp_name=exp_name)
-    return config, exp_name
+    return config
 
 def create_readme(config, path):
     print(config.__dict__)
@@ -152,6 +152,7 @@ def get_dataset(cfg):
     on_memory:bool = False
     dataset_dict:dict = parse_dataset(dataset_names, dataset_yamls, preproc_config, num_trial_limit,
                                     h5_root, image_preprocs, meg_preprocs, only_meg, on_memory)
+    # import pdb; pdb.set_trace()
     crop_pix = int(cfg.training.crop_ratio*cfg.training.img_size)
     img_transform_train = transforms.Compose([
         normalize,
