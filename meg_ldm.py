@@ -86,18 +86,23 @@ def get_args_parser():
     parser.add_argument('--meg_h5name', type=str, default=None)
     parser.add_argument('--wandb_key_path', type='str', default=None)
     parser.add_argument('--device_counts', type=int, default=1)
+    parser.add_argument('--ldf_exp', type=int, default=1)
 
     # # distributed training parameters
     # parser.add_argument('--local_rank', type=int)
 
     return parser.parse_args()
 
-def update_config(args, config):
+def update_config(args, config, exp_name):
     for attr in config.__dict__:
         if hasattr(args, attr):
             if getattr(args, attr) != None:
                 setattr(config, attr, getattr(args, attr))
-    return config
+
+    config.logdir = config.logdir.format(exp_name=exp_name)
+    config.ckpt_dir = config.ckpt_dir.format(exp_name=exp_name)
+    config.reconst_dir = config.reconst_dir.format(exp_name=exp_name)
+    return config, exp_name
 
 def create_readme(config, path):
     print(config.__dict__)
@@ -177,10 +182,27 @@ def main(config, args):
     }
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     # create generateive model
-    generative_model = eLDM(pretrain_mbm_metafile, num_voxels,
+    eldm = eLDM(pretrain_mbm_metafile, num_voxels,
                 device=device, pretrain_root=config.pretrain_gm_path, logger=config.logger,
                 ddim_steps=config.ddim_steps, global_pool=config.global_pool, use_time_cond=config.use_time_cond,
                 clip_tune = config.clip_tune, cls_tune = config.cls_tune)
+    generative_model = eldm.model
+
+    # model settings
+    generative_model.main_config = config
+    generative_model.output_path = config.output_path
+    generative_model.run_full_validation_threshold = 0.15
+    generative_model.learning_rate = config.lr
+    generative_model.eval_avg = config.eval_avg
+
+    # trainable settings
+    generative_model.unfreeze_whole_model()
+    generative_model.freeze_first_stage()
+    # generative_model.freeze_whole_model()
+    # generative_model.unfreeze_cond_stage()
+    generative_model.train_cond_stage_only = True
+
+
     # diffusion trainer
     if args.wandb_key_path is not None:
         usewandb=True
@@ -190,7 +212,7 @@ def main(config, args):
         wandb.login(key = f'{wandb_key}')
         # wandb.init(project='llm_hackason-'+args.config)
         # wandb.init(project='llm_hackason-new_prompt')
-        wandb.init(project='meg-god')
+        wandb.init(project='meg-difusion')
     else:
         usewandb=False
     trainer = DiffusionTrainer(config, args.device_counts, usewandb)
@@ -218,5 +240,9 @@ if __name__ == '__main__':
         meg_cfg.h5_root = meg_cfg.h5_root.format(h5_name='fs{}-bp{}_{}'.format(meg_cfg.preprocess.brain_resample_rate, *meg_cfg.preprocess.bandpass_filter))
     else:
         meg_cfg.h5_root = meg_cfg.h5_root.format(h5_name=args.meg_h5name)
-    meg_cfg.training = update_config(args, meg_cfg.training)
+
+    exp_name = args.meg_exp + '-' + args.ldf_exp
+    print('experiment name is ', exp_name)
+    meg_cfg.training = update_config(args, meg_cfg.training, exp_name)
+    meg_cfg.output_path = meg_cfg.output_path.format(exp_name=exp_name)
     main(meg_cfg, args)
