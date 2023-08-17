@@ -145,6 +145,15 @@ cossim-global pool lora
 python eeg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config config_generative_model --meg_encode
 r scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200 --meg_h5name vc-fs1000-dura200-1 
 
+
+## ROI=ALL
+`train_ssl.py --config sbj1_all_all --model scmbm --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200-roi_all --h5name fs1000-dura200-roi_all-1 --wandbkey /home/yainoue/wandb_inoue.txt`
+
+## SEED change
+`python train_ssl.py --config sbj1_10k --model scmbm --preprocess fs1000_dura500 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_4-fs1000-dura500-10k-seed_0 --h5name vc-fs1000-dura200-3 --seed 0`
+
+`python train_ssl.py --config sbj1_all --model scmbm --preprocess fs1000_dura500 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_4-fs1000-dura500-seed_0 --h5name vc-fs1000-dura200-2 --seed 0`
+
 ### 実験計画
 #### 事前学習
 1. 訓練データサイズ
