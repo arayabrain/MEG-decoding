@@ -86,7 +86,7 @@ def get_args_parser():
     parser.add_argument('--meg_h5name', type=str, default=None)
     parser.add_argument('--wandb_key_path', type='str', default=None)
     parser.add_argument('--device_counts', type=int, default=1)
-    parser.add_argument('--ldf_exp', type=int, default=1)
+    parser.add_argument('--ldf_exp', type=str, default='test')
 
     # # distributed training parameters
     # parser.add_argument('--local_rank', type=int)
