@@ -121,14 +121,14 @@ class DDPM(pl.LightningModule):
         self.return_cond = False
         self.output_path = None
         self.main_config = None
-        self.best_val = 0.0 
+        self.best_val = 0.0
         self.run_full_validation_threshold = 0.0
         self.eval_avg = True
 
     def re_init_ema(self):
         if self.use_ema:
             self.model_ema = LitEma(self.model)
-            print(f"Keeping EMAs of {len(list(self.model_ema.buffers()))}.")   
+            print(f"Keeping EMAs of {len(list(self.model_ema.buffers()))}.")
 
     def register_schedule(self, given_betas=None, beta_schedule="linear", timesteps=1000,
                           linear_start=1e-4, linear_end=2e-2, cosine_s=8e-3):
@@ -361,7 +361,7 @@ class DDPM(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         self.train()
         self.cond_stage_model.train()  ###到底是在哪里训练的
-        
+
         loss, loss_dict = self.shared_step(batch)
 
         self.log_dict(loss_dict, prog_bar=True,
@@ -370,16 +370,16 @@ class DDPM(pl.LightningModule):
         if self.use_scheduler:
             lr = self.optimizers().param_groups[0]['lr']
             self.log('lr_abs', lr, prog_bar=True, logger=True, on_step=False, on_epoch=True)
-        
+
         return loss
 
-    
+
     @torch.no_grad()
     def generate(self, data, num_samples, ddim_steps=300, HW=None, limit=None, state=None):
         # fmri_embedding: n, seq_len, embed_dim
         all_samples = []
         if HW is None:
-            shape = (self.p_channels, 
+            shape = (self.p_channels,
                 self.p_image_size, self.p_image_size)
         else:
             num_resolutions = len(self.ch_mult)
@@ -399,7 +399,7 @@ class DDPM(pl.LightningModule):
 
         # rng = torch.Generator(device=self.device).manual_seed(2022).set_state(state)
 
-        # state = torch.cuda.get_rng_state()    
+        # state = torch.cuda.get_rng_state()
         with model.ema_scope():
             for count, item in enumerate(zip(data['eeg'], data['image'])):
                 if limit is not None:
@@ -410,7 +410,7 @@ class DDPM(pl.LightningModule):
                 print(f"rendering {num_samples} examples in {ddim_steps} steps.")
                 # c = model.get_learned_conditioning(repeat(latent, 'h w -> c h w', c=num_samples).to(self.device))
                 c, re_latent = model.get_learned_conditioning(repeat(latent, 'h w -> c h w', c=num_samples).to(self.device))
-                samples_ddim, _ = sampler.sample(S=ddim_steps, 
+                samples_ddim, _ = sampler.sample(S=ddim_steps,
                                                 conditioning=c,
                                                 batch_size=num_samples,
                                                 shape=shape,
@@ -420,9 +420,9 @@ class DDPM(pl.LightningModule):
                 x_samples_ddim = model.decode_first_stage(samples_ddim)
                 x_samples_ddim = torch.clamp((x_samples_ddim+1.0)/2.0,min=0.0, max=1.0)
                 gt_image = torch.clamp((gt_image+1.0)/2.0,min=0.0, max=1.0)
-                
+
                 all_samples.append(torch.cat([gt_image.detach().cpu(), x_samples_ddim.detach().cpu()], dim=0)) # put groundtruth at first
-        
+
         # display as grid
         grid = torch.stack(all_samples, 0)
         grid = rearrange(grid, 'n b c h w -> (n b) c h w')
@@ -431,6 +431,7 @@ class DDPM(pl.LightningModule):
         # to image
         grid = 255. * rearrange(grid, 'c h w -> h w c').cpu().numpy()
         return grid, (255. * torch.stack(all_samples, 0).cpu().numpy()).astype(np.uint8), state
+
 
     def save_images(self, all_samples, suffix=0):
         # print('output_path')
@@ -441,9 +442,10 @@ class DDPM(pl.LightningModule):
                 # for copy_idx, img in enumerate(imgs[1:]):
                 for copy_idx, img in enumerate(imgs):
                     img = rearrange(img, 'c h w -> h w c')
-                    Image.fromarray(img).save(os.path.join(self.output_path, 'val', 
+                    Image.fromarray(img).save(os.path.join(self.output_path, 'val',
                                     f'{self.validation_count}_{suffix}', f'test{sp_idx}-{copy_idx}.png'))
-                    print('saved rendered image to ', os.path.join(self.output_path, 'val', f'{self.validation_count}_{suffix}', f'test{sp_idx}-{copy_idx}.png'))               
+                    print('saved rendered image to ', os.path.join(self.output_path, 'val', f'{self.validation_count}_{suffix}', f'test{sp_idx}-{copy_idx}.png'))
+
     def full_validation(self, batch, state=None):
         print('###### run full validation! ######\n')
         grid, all_samples, state = self.generate(batch, ddim_steps=self.ddim_steps, num_samples=5, limit=None, state=state)
@@ -469,7 +471,7 @@ class DDPM(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         if batch_idx != 0:
             return
-        
+
         if self.validation_count % 5 == 0 and self.trainer.current_epoch != 0:
             self.full_validation(batch)
         else:
@@ -487,7 +489,7 @@ class DDPM(pl.LightningModule):
     def get_eval_metric(self, samples, avg=True):
         metric_list = ['mse', 'pcc', 'ssim', 'psm']
         res_list = []
-        
+
         gt_images = [img[0] for img in samples]
         gt_images = rearrange(np.stack(gt_images), 'n c h w -> n h w c')
         samples_to_run = np.arange(1, len(samples[0])) if avg else [1]
@@ -498,20 +500,20 @@ class DDPM(pl.LightningModule):
                 pred_images = rearrange(np.stack(pred_images), 'n c h w -> n h w c')
                 res = get_similarity_metric(pred_images, gt_images, method='pair-wise', metric_name=m)
                 res_part.append(np.mean(res))
-            res_list.append(np.mean(res_part))     
+            res_list.append(np.mean(res_part))
         res_part = []
         for s in samples_to_run:
             pred_images = [img[s] for img in samples]
             pred_images = rearrange(np.stack(pred_images), 'n c h w -> n h w c')
-            res = get_similarity_metric(pred_images, gt_images, 'class', None, 
-                            n_way=50, num_trials=50, top_k=1, device='cuda')
+            res = get_similarity_metric(pred_images, gt_images, 'class', None,
+                            n_way=50, num_trials=50, top_k=1, device='cuda') # need more than 50 images per batch ?
             res_part.append(np.mean(res))
         res_list.append(np.mean(res_part))
         res_list.append(np.max(res_part))
         metric_list.append('top-1-class')
         metric_list.append('top-1-class (max)')
 
-        return res_list, metric_list    
+        return res_list, metric_list
 
     def on_train_batch_end(self, *args, **kwargs):
         if self.use_ema:
@@ -609,10 +611,10 @@ class LatentDiffusion(DDPM):
             self.register_buffer('scale_factor', torch.tensor(scale_factor))
         self.instantiate_first_stage(first_stage_config)
         self.instantiate_cond_stage(cond_stage_config)
-      
+
         self.cond_stage_forward = cond_stage_forward
         self.clip_denoised = False
-        self.bbox_tokenizer = None  
+        self.bbox_tokenizer = None
 
         self.restarted_from_ckpt = False
         if ckpt_path is not None:
@@ -676,7 +678,7 @@ class LatentDiffusion(DDPM):
     def unfreeze_cond_stage(self):
         for param in self.cond_stage_model.parameters():
             param.requires_grad = True
-   
+
 
     def freeze_first_stage(self):
         self.first_stage_model.trainable = False
@@ -697,7 +699,7 @@ class LatentDiffusion(DDPM):
         self.first_stage_model.trainable = True
         for param in self.parameters():
             param.requires_grad = True
-        
+
     def instantiate_cond_stage(self, config):
         if not self.cond_stage_trainable:
             if config == "__is_first_stage__":
@@ -843,7 +845,15 @@ class LatentDiffusion(DDPM):
     @torch.no_grad()
     def get_input(self, batch, k, return_first_stage_outputs=False, force_c_encode=False,
                   cond_key=None, return_original_cond=False, bs=None):
+
         x = super().get_input(batch, k)
+        ## super().get_input()の内容: keyに対応するvalueを取り出し、4次元のテンソルにする.
+        ## その後
+        ## x = batch[k]
+        ## if len(x.shape) == 3:
+        ##     x = x[..., None]
+        ## x = rearrange(x, 'b h w c -> b c h w')
+        ## x = x.to(memory_format=torch.contiguous_format).float()
         if bs is not None:
             x = x[:bs]
         x = x.to(self.device)
@@ -856,11 +866,12 @@ class LatentDiffusion(DDPM):
         # print(cond_key)
         # print(self.cond_stage_key)
         # print(cond_key)
+        import pdb; pdb.set_trace()
         if self.model.conditioning_key is not None:
             if cond_key is None:
                 cond_key = self.cond_stage_key
             if cond_key != self.first_stage_key:
-                if cond_key in ['caption', 'coordinates_bbox','fmri', 'eeg']:
+                if cond_key in ['caption', 'coordinates_bbox','fmri', 'eeg', 'meg']: # added by inoue
                     xc = batch[cond_key]
                 elif cond_key == 'class_label':
                     xc = batch
@@ -875,6 +886,7 @@ class LatentDiffusion(DDPM):
                 # print('get learned condition')
                 if isinstance(xc, dict) or isinstance(xc, list):
                     # import pudb; pudb.set_trace()
+                    # cond stage model でEncode
                     c, re_latent = self.get_learned_conditioning(xc)
                     # c = self.get_learned_conditioning(xc)
                 else:
@@ -886,6 +898,7 @@ class LatentDiffusion(DDPM):
                 c = c[:bs]
 
             if self.use_positional_encodings:
+                raise NotImplementedError('compute_latent_shifts is not implemted. added by inoue')
                 pos_x, pos_y = self.compute_latent_shifts(batch)
                 ckey = __conditioning_keys__[self.model.conditioning_key]
                 c = {ckey: c, 'pos_x': pos_x, 'pos_y': pos_y}
@@ -894,6 +907,7 @@ class LatentDiffusion(DDPM):
             c = None
             xc = None
             if self.use_positional_encodings:
+                raise NotImplementedError('compute_latent_shifts is not implemted. added by inoue')
                 pos_x, pos_y = self.compute_latent_shifts(batch)
                 c = {'pos_x': pos_x, 'pos_y': pos_y}
         out = [z, c , batch['label'], batch['image_raw']]
@@ -995,7 +1009,7 @@ class LatentDiffusion(DDPM):
                 z = z.view((z.shape[0], -1, ks[0], ks[1], z.shape[-1]))  # (bn, nc, ks[0], ks[1], L )
 
                 # 2. apply model loop over last dim
-                if isinstance(self.first_stage_model, VQModelInterface):  
+                if isinstance(self.first_stage_model, VQModelInterface):
                     output_list = [self.first_stage_model.decode(z[:, :, :, :, i],
                                                                  force_not_quantize=predict_cids or force_not_quantize)
                                    for i in range(z.shape[-1])]
@@ -1027,6 +1041,22 @@ class LatentDiffusion(DDPM):
     @torch.no_grad()
     def encode_first_stage(self, x):
         return self.first_stage_model.encode(x)
+
+    def training_step(self, batch, batch_idx):
+        # same as ddpm. but for clear understanding, putting this here
+        self.train()
+        self.cond_stage_model.train()  ###到底是在哪里训练的
+
+        loss, loss_dict = self.shared_step(batch)
+
+        self.log_dict(loss_dict, prog_bar=True,
+                    logger=True, on_step=False, on_epoch=True)
+
+        if self.use_scheduler:
+            lr = self.optimizers().param_groups[0]['lr']
+            self.log('lr_abs', lr, prog_bar=True, logger=True, on_step=False, on_epoch=True)
+
+        return loss
 
     def shared_step(self, batch, **kwargs):
         opt = self.optimizers()
@@ -1063,9 +1093,9 @@ class LatentDiffusion(DDPM):
             self.manual_backward(total_loss)
             opt.step()
             self.debug_params()
-            
+
             return loss, cc
-        else:    
+        else:
             loss = self(x, c, label, image_raw) # loss, loss_dict
             # print('DEBUG: loss', loss)
             # I dont know why, but it does not update parameters
@@ -1076,7 +1106,7 @@ class LatentDiffusion(DDPM):
             opt.step()
             # self.debug_params()
             return loss
-        
+
     def debug_params(self, cnt_limit=3):
         cnt = 0
         for name, parameter in self.named_parameters():
@@ -1149,14 +1179,14 @@ class LatentDiffusion(DDPM):
         """
         imgs: [N, 1, num_voxels]
         pred: [N, L, p]
-        mask: [N, L], 0 is keep, 1 is remove, 
+        mask: [N, L], 0 is keep, 1 is remove,
         """
         # target = self.patchify(imgs)
 
         loss = (pred - imgs) ** 2
         loss = loss.mean()
         # loss = loss.mean(dim=-1)  # [N, L], mean loss per patch
-        
+
         # loss = (loss * mask).sum() / mask.sum()  if mask.sum() != 0 else (loss * mask).sum() # mean loss on removed patches
         return loss
     def cls_loss(self, label, pred):
@@ -1569,14 +1599,14 @@ class LatentDiffusion(DDPM):
         lr = self.learning_rate
         if self.train_cond_stage_only:
             print(f"{self.__class__.__name__}: Only optimizing conditioner params!")
-            cond_parms = [p for n, p in self.named_parameters() 
+            cond_parms = [p for n, p in self.named_parameters()
                     if 'attn2' in n or 'time_embed_condtion' in n or 'norm2' in n]
-            # cond_parms = [p for n, p in self.named_parameters() 
+            # cond_parms = [p for n, p in self.named_parameters()
                     # if 'time_embed_condtion' in n]
             # cond_parms = []
-            
+
             params = list(self.cond_stage_model.parameters()) + cond_parms
-        
+
             for p in params:
                 p.requires_grad = True
 
@@ -1602,7 +1632,7 @@ class LatentDiffusion(DDPM):
                     'frequency': 1
                 }]
             return [opt], scheduler
-            
+
         return opt
 
     @torch.no_grad()
@@ -1664,10 +1694,10 @@ class EEGClassifier(pl.LightningModule):
         #     self.scheduler_config = scheduler_config
         self.cond_stage_trainable = True
         self.main_config = None
-        self.best_val = 0.0 
+        self.best_val = 0.0
         self.cond_stage_model = None
         self.validation_count = 0
-        
+
     def forward(self, x, c, label, image_raw, *args, **kwargs):
         # print(self.num_timesteps)
         # t = torch.randint(0, self.num_timesteps, (x.shape[0],), device=self.device).long()
@@ -1695,7 +1725,7 @@ class EEGClassifier(pl.LightningModule):
             image_embeds = self.image_embedder(image_raw)
             loss_clip = self.cond_stage_model.get_clip_loss(re_latent, image_embeds)
         # loss_recon = self.recon_loss(imgs, rencon)
-        
+
             loss += loss_clip
         # loss += loss_cls # loss_recon +  #(self.original_elbo_weight * loss_vlb)
         # loss_dict.update({f'{prefix}/loss_recon': loss_recon})
@@ -1719,7 +1749,7 @@ class EEGClassifier(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         self.train()
         self.cond_stage_model.train()  ###到底是在哪里训练的
-        
+
         loss, loss_dict = self.shared_step(batch)
 
         self.log_dict(loss_dict, prog_bar=True,
@@ -1735,14 +1765,14 @@ class EEGClassifier(pl.LightningModule):
         lr = self.learning_rate
         # if self.train_cond_stage_only:
         #     print(f"{self.__class__.__name__}: Only optimizing conditioner params!")
-        #     cond_parms = [p for n, p in self.named_parameters() 
+        #     cond_parms = [p for n, p in self.named_parameters()
         #             if 'attn2' in n or 'time_embed_condtion' in n or 'norm2' in n]
-        #     # cond_parms = [p for n, p in self.named_parameters() 
+        #     # cond_parms = [p for n, p in self.named_parameters()
         #             # if 'time_embed_condtion' in n]
         #     # cond_parms = []
-            
+
         params = list(self.cond_stage_model.parameters()) # + cond_parms
-        
+
         for p in params:
             p.requires_grad = True
 
@@ -1769,7 +1799,7 @@ class EEGClassifier(pl.LightningModule):
         #             'frequency': 1
         #         }]
         #     return [opt], scheduler
-            
+
         return opt
 
     @torch.no_grad()
@@ -1860,7 +1890,7 @@ class EEGClassifier(pl.LightningModule):
         print('batch_idx:', batch_idx)
         # if batch_idx != 0:
         #     return
-        
+
         if self.validation_count % 1 == 0 and self.trainer.current_epoch != 0:
             self.full_validation(batch)
         # else:

@@ -170,7 +170,7 @@ def main(config, args):
             meg_cfg.h5_root = meg_cfg.h5_root.format(h5_name=args.meg_h5name)
         from transformers import AutoProcessor
         from meg_ssl.utils.image_preprocess import numpy2image
-        vit_processor = AutoProcessor.from_pretrained("openai/clip-vit-large-patch14")
+
         class DiffusionDataset():
             def __init__(self, dataset, split='train'):
                 self.dataset = dataset
@@ -179,13 +179,13 @@ def main(config, args):
                 else:
                     self.img_transform = img_transform_test
                 self.vit_processor = AutoProcessor.from_pretrained("openai/clip-vit-large-patch14")
-                
+
             def __len__(self):
                 return len(self.dataset)
             @property
             def datasets(self):
                 return self.dataset.datasets
-            
+
             def __getitem__(self, idx):
                 ret = {}
                 eeg, image = self.dataset[idx]
@@ -196,7 +196,7 @@ def main(config, args):
                 ret['image'] = self.img_transform(image.astype(np.float32)/255.0)
                 ret['eeg'] = torch.from_numpy(eeg)
                 ret['label'] = 0 # dummy
-                
+
                 return ret
 
         def get_dataset(cfg):
@@ -224,7 +224,7 @@ def main(config, args):
             'config': meg_cfg.meg_encoder.parameters
         }
         # img_transform_train, img_transform_test
-        
+
         def train_collate_fn(batch):
             new_batch = {}
             image_raw = [numpy2image(b[1]) for b in batch]
@@ -234,7 +234,7 @@ def main(config, args):
             new_batch['image'] = torch.stack([img_transform_train(b[1]/255.0) for b in batch])
             new_batch['eeg'] = torch.stack([torch.from_numpy(b[0]) for b in batch])
             new_batch['label'] = torch.empty(len(new_batch['image']), 1) # dummy
-            
+
             return new_batch
         def test_collate_fn(batch):
             new_batch = {}
@@ -245,7 +245,7 @@ def main(config, args):
             new_batch['image'] = torch.stack([img_transform_test(b[1]/255.0) for b in batch])
             new_batch['eeg'] = torch.stack([torch.from_numpy(b[0]) for b in batch])
             new_batch['label'] = torch.empty(len(new_batch['image']), 1) # dummy
-            
+
             return new_batch
 
     else:
