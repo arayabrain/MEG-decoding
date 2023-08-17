@@ -16,7 +16,7 @@ from meg_ssl.generate_configs.config import Config_Generative_Model
 # from dataset import  create_EEG_dataset
 from meg_ssl.models.dc_ldm.ldm_for_eeg import eLDM
 from meg_ssl.utils.diffusion_utils.eval_metrics import get_similarity_metric
-from meg_ssl.utils.commons import set_seed, get_device_count, get_device
+from meg_ssl.utils.commons import set_seed
 from hydra import compose, initialize
 from meg_ssl.dataclass import parse_dataset
 from transformers import AutoProcessor
