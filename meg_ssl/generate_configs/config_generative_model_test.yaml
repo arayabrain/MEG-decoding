@@ -46,7 +46,7 @@ training:
     crop_ratio: 0.2
     global_pool: False
     use_time_cond: True
-    clip_tune: True #False
+    clip_tune: False #False
     cls_tune: False
     eval_avg: True
     num_samples: 5
@@ -54,9 +54,11 @@ training:
     HW: null
     model_meta: null
     checkpoint_path: null
+    allow_full_validation: False
 
-    logdir: '../../results_task/dream_diffusion_test/{exp_name}/log'
-    ckpt_dir: '../../results_task/dream_diffusion_test/{exp_name}/ckpt'
+    logdir: '../../results_task/dream_diffusion/{exp_name}/log'
+    ckpt_dir: '../../results_task/dream_diffusion/{exp_name}/ckpt'
+    reconst_dir: '../../results_task/dream_diffusion/{exp_name}/reconst'
     # ========fine-tuning========
     meg_encoder_finetune: none
     image_encoder_finetune: none
@@ -68,6 +70,6 @@ training:
         init_temperature: 5.1
 
 
-root_path: '../../results_task/dream_diffusion_test/'
-output_path: '../../results_task/dream_diffusion_test/{exp_name}/'
+root_path: '../../results_task/dream_diffusion/'
+output_path: '../../results_task/dream_diffusion/{exp_name}/'
 

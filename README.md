@@ -144,6 +144,9 @@ cossim-global pool lora
 ## Diffusion
 `python eeg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config config_generative_model --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200 --meg_h5name vc-fs1000-dura200-1`
 
+## Diffusion2
+`python meg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config config_generative_model --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200 --meg_h5name vc-fs1000-dura200-1`
+
 python eeg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config config_generative_model --meg_encode
 r scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200 --meg_h5name vc-fs1000-dura200-1
 
