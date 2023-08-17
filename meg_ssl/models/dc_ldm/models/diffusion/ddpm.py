@@ -846,7 +846,7 @@ class LatentDiffusion(DDPM):
     def get_input(self, batch, k, return_first_stage_outputs=False, force_c_encode=False,
                   cond_key=None, return_original_cond=False, bs=None):
 
-        x = super().get_input(batch, k)
+        x = super().get_input(batch, k) # k=image
         ## super().get_input()の内容: keyに対応するvalueを取り出し、4次元のテンソルにする.
         ## その後
         ## x = batch[k]
@@ -866,13 +866,12 @@ class LatentDiffusion(DDPM):
         # print(cond_key)
         # print(self.cond_stage_key)
         # print(cond_key)
-        import pdb; pdb.set_trace()
-        if self.model.conditioning_key is not None:
-            if cond_key is None:
-                cond_key = self.cond_stage_key
-            if cond_key != self.first_stage_key:
-                if cond_key in ['caption', 'coordinates_bbox','fmri', 'eeg', 'meg']: # added by inoue
-                    xc = batch[cond_key]
+        if self.model.conditioning_key is not None: # crossattn
+            if cond_key is None: # cond_key = None
+                cond_key = self.cond_stage_key # 'eeg'
+            if cond_key != self.first_stage_key: # 'image'
+                if cond_key in ['caption', 'coordinates_bbox','fmri', 'eeg', 'meg']: # True
+                    xc = batch[cond_key] # key of batch is image_raw, image, eeg, label
                 elif cond_key == 'class_label':
                     xc = batch
                 else:
@@ -882,7 +881,7 @@ class LatentDiffusion(DDPM):
             # print('get input')
             # print(not self.cond_stage_trainable)
             # print(force_c_encode)
-            if not self.cond_stage_trainable or force_c_encode :
+            if not self.cond_stage_trainable or force_c_encode : # cond_stage_trainable=True, force_c_encode=False
                 # print('get learned condition')
                 if isinstance(xc, dict) or isinstance(xc, list):
                     # import pudb; pudb.set_trace()
@@ -896,7 +895,6 @@ class LatentDiffusion(DDPM):
                 c = xc
             if bs is not None:
                 c = c[:bs]
-
             if self.use_positional_encodings:
                 raise NotImplementedError('compute_latent_shifts is not implemted. added by inoue')
                 pos_x, pos_y = self.compute_latent_shifts(batch)
@@ -1136,6 +1134,7 @@ class LatentDiffusion(DDPM):
         if self.model.conditioning_key is not None:
             assert c is not None
             imgs = c
+            # ここでmegをencodeする。get_inputでencodeすることも可能
             if self.cond_stage_trainable:
                 # c = self.get_learned_conditioning(c)
                 c, re_latent = self.get_learned_conditioning(c)

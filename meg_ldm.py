@@ -184,17 +184,18 @@ def main(config, args):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     # create generateive model
     eldm = eLDM(pretrain_mbm_metafile, num_voxels,
-                device=device, pretrain_root=config.pretrain_gm_path, logger=config.logger,
-                ddim_steps=config.ddim_steps, global_pool=config.global_pool, use_time_cond=config.use_time_cond,
-                clip_tune = config.clip_tune, cls_tune = config.cls_tune)
+                device=device, pretrain_root=config.pretrain_gm_path, logger=None,
+                ddim_steps=config.training.ddim_steps, global_pool=config.training.global_pool, 
+                use_time_cond=config.training.use_time_cond,
+                clip_tune = config.training.clip_tune, cls_tune = config.training.cls_tune)
     generative_model = eldm.model
 
     # model settings
     generative_model.main_config = config
     generative_model.output_path = config.output_path
     generative_model.run_full_validation_threshold = 0.15
-    generative_model.learning_rate = config.lr
-    generative_model.eval_avg = config.eval_avg
+    generative_model.learning_rate = config.training.lr
+    generative_model.eval_avg = config.training.eval_avg
 
     # trainable settings
     generative_model.unfreeze_whole_model()
@@ -216,7 +217,7 @@ def main(config, args):
         wandb.init(project='meg-difusion')
     else:
         usewandb=False
-    trainer = DiffusionTrainer(config, args.device_counts, usewandb)
+    trainer = DiffusionTrainer(config.training, args.device_counts, usewandb)
     # fit
     trainer.fit(generative_model, [], train_dataset, val_dataset)
 

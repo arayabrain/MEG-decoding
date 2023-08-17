@@ -115,6 +115,7 @@ class DiffusionTrainer(BaseSSLTrainer):
 
     def train_one_epoch(self, epoch:int)->dict:
         self.generator.train()
+        self.generator.encode_first_stage.eval() # image encoderは、trainingの対象外
         self.generator.cond_stage_model.train()
         loss_logs = {}
         with tqdm.tqdm(self.train_loader) as pbar:
@@ -138,24 +139,28 @@ class DiffusionTrainer(BaseSSLTrainer):
         # label: batch['label']
         # image_raw: batch['image_raw']
         x, c, label, image_raw = self.generator.get_input(batch, self.generator.first_stage_key)
+        x = x.to(self.device)
+        c = c.to(self.device)
+        label = label.to(self.device)
+        image_raw = image_raw.to(self.device)
         if self.generator.return_cond:
             loss, cc = self.generator(x, c, label, image_raw)
             total_loss = loss[0]
             loss_dict = loss[1]
             total_loss.backward()
             self.optimizer.step()
-            return loss, loss_dict, cc
+            return total_loss.item(), {k:v.item() for k, v in loss_dict.items()}, cc
         else:
             loss = self.generator(x, c, label, image_raw)
             total_loss = loss[0]
             loss_dict = loss[1]
             total_loss.backward()
             self.optimizer.step()
-            return loss, loss_dict, None
+            return total_loss.item(), {k:v.item() for k, v in loss_dict.items()}, None
 
     def validation(self, epoch:int)->dict:
         self.generator.eval()
-        self.generator.freeze_first_stage.eval()
+        self.generator.encode_first_stage.eval()
         self.generator.cond_stage_model.eval()
         metrics_logs = {}
         limit=5

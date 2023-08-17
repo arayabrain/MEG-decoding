@@ -22,12 +22,14 @@ total_limit:
     val:
         GOD: 1200 # total number of samples across sessions
 
+
 # ========path========
 h5_root: ../../../dataset/ssl_dataset/{h5_name}
 resume_path: null
 meg_encoder_path: '../../results_ssl/{exp_name}/ckpt/best.pth' #
 image_encoder_path: null # null is allowed
-pretrain_gm_path: ../dreamdiffusion
+pretrain_gm_path: ../dreamdiffusion/pretrains
+
 
 # ========training========
 training:
@@ -48,7 +50,7 @@ training:
     crop_ratio: 0.2
     global_pool: False
     use_time_cond: True
-    clip_tune: True #False
+    clip_tune: False #False
     cls_tune: False
     eval_avg: True
     num_samples: 5
@@ -74,4 +76,3 @@ training:
 
 root_path: '../../results_task/dream_diffusion/'
 output_path: '../../results_task/dream_diffusion/{exp_name}/'
-
