@@ -21,6 +21,7 @@ from hydra import compose, initialize
 from meg_ssl.dataclass import parse_dataset
 from transformers import AutoProcessor
 from meg_ssl.utils.image_preprocess import numpy2image
+from meg_ssl.trainers import DiffusionTrainer
 # vit_processor = AutoProcessor.from_pretrained("openai/clip-vit-large-patch14")
 
 
@@ -83,6 +84,8 @@ def get_args_parser():
     parser.add_argument('--meg_preprocess', type=str, default=None)
     parser.add_argument('--meg_exp', type=str, default=None)
     parser.add_argument('--meg_h5name', type=str, default=None)
+    parser.add_argument('--wandb_key_path', type='str', default=None)
+    parser.add_argument('--device_counts', type=int, default=1)
 
     # # distributed training parameters
     # parser.add_argument('--local_rank', type=int)
@@ -163,7 +166,7 @@ def get_dataset(cfg):
     return DiffusionDataset(dataset_dict['train'], img_transform_train), DiffusionDataset(dataset_dict['val'], img_transform_test)
 
 
-def main(config):
+def main(config, args):
     train_dataset, val_dataset = get_dataset(config)
     num_voxels = int(meg_cfg.preprocess.meg_duration * meg_cfg.preprocess.brain_resample_rate) # eeg_latents_dataset_train.datasets[0].num_electrodes
     meg_encoder_pretrained_path = os.path.join(meg_cfg.meg_encoder_path.format(exp_name=args.meg_exp))
@@ -179,10 +182,20 @@ def main(config):
                 ddim_steps=config.ddim_steps, global_pool=config.global_pool, use_time_cond=config.use_time_cond,
                 clip_tune = config.clip_tune, cls_tune = config.cls_tune)
     # diffusion trainer
-
+    if args.wandb_key_path is not None:
+        usewandb=True
+        with open(args.wandb_key_path, 'r') as f:
+            wandb_key = f.read()
+            wandb_key = wandb_key.split('\n')[0]
+        wandb.login(key = f'{wandb_key}')
+        # wandb.init(project='llm_hackason-'+args.config)
+        # wandb.init(project='llm_hackason-new_prompt')
+        wandb.init(project='meg-god')
+    else:
+        usewandb=False
+    trainer = DiffusionTrainer(config, args.device_counts, usewandb)
     # fit
-
-    # generate
+    trainer.fit(generative_model, [], train_dataset, val_dataset)
 
 
 
@@ -206,3 +219,4 @@ if __name__ == '__main__':
     else:
         meg_cfg.h5_root = meg_cfg.h5_root.format(h5_name=args.meg_h5name)
     meg_cfg.training = update_config(args, meg_cfg.training)
+    main(meg_cfg, args)
