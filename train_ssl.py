@@ -20,7 +20,7 @@ def get_dataset(cfg:OmegaConf):
     image_preprocs:list = []
     meg_preprocs:list = []
     only_meg:bool = True
-    on_memory:bool = False
+    on_memory:bool = True #False
     dataset_dict:dict = parse_dataset(dataset_names, dataset_yamls, preproc_config, num_trial_limit, 
                                       h5_root, image_preprocs, meg_preprocs, only_meg, on_memory)
     

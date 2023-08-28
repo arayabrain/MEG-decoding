@@ -87,6 +87,7 @@ def get_args_parser():
     parser.add_argument('--wandb_key_path', type=str, default=None)
     parser.add_argument('--device_counts', type=int, default=1)
     parser.add_argument('--ldf_exp', type=str, default='test')
+    parser.add_argument('--datadir', type=str, default='sbj1')
 
     # # distributed training parameters
     # parser.add_argument('--local_rank', type=int)
@@ -175,7 +176,7 @@ def get_dataset(cfg):
 def main(config, args):
     train_dataset, val_dataset = get_dataset(config)
     num_voxels = int(meg_cfg.preprocess.meg_duration * meg_cfg.preprocess.brain_resample_rate) # eeg_latents_dataset_train.datasets[0].num_electrodes
-    meg_encoder_pretrained_path = os.path.join(meg_cfg.meg_encoder_path.format(exp_name=args.meg_exp))
+    meg_encoder_pretrained_path = os.path.join(meg_cfg.meg_encoder_path.format(sbj_name=args.datadir, exp_name=args.meg_exp))
     meg_cfg.meg_encoder.parameters.in_chans = val_dataset.datasets[0].num_electrodes
     pretrain_mbm_metafile = {
         'model':torch.load(meg_encoder_pretrained_path),
@@ -202,7 +203,7 @@ def main(config, args):
     generative_model.freeze_first_stage()
     # generative_model.freeze_whole_model()
     # generative_model.unfreeze_cond_stage()
-    generative_model.train_cond_stage_only = True
+    generative_model.train_cond_stage_only = False # True
 
 
     # diffusion trainer

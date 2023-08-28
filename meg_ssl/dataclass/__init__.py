@@ -10,7 +10,8 @@ from meg_ssl.ssl_configs.dataset.drama.dataset_info import get_dataset_info as g
 from meg_ssl.ssl_configs.dataset.GOD.dataset_info import get_dataset_info as get_god_dataset_info
 
 
-BLACK_MAT_FILE_LIST = ['sbj01/ID08_DreamGirlsVol1_1_id8_MEG_DATAPixx_part4.mat']
+BLACK_MAT_FILE_LIST = ['sbj01/ID08_DreamGirlsVol1_1_id8_MEG_DATAPixx_part4.mat',
+                       'sbj03/ID08_DreamGirlsVol1_1_id8_MEG_DATAPixx_part5.mat']
 
 def parse_dataset(dataset_names:dict, dataset_yamls:dict, preproc_config:OmegaConf,
                   num_trial_limits_dict:dict, h5_root:str, image_preprocs:list=[], meg_preprocs:list=[],

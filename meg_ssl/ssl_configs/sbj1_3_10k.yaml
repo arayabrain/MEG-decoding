@@ -1,0 +1,43 @@
+defaults:
+# ========model========
+    - model:  scmbm
+# ========prerpocessing========
+    - preprocess: base
+            
+# ========dataset========
+dataset_name:
+    train:
+        drama: sbj_1_3-session_all # all 1_3, 1~3
+    val:
+        GOD: sbj_1_3-train-session_6_12
+dataset_yaml:
+    drama: drama/drama_vc.yaml # drama_config.yaml # region 160 ch
+    GOD: GOD/god_vc.yaml # god_config.yaml
+total_limit:
+    train:
+        drama: 10000 # total number of samples across sessions about: 31200
+    val:
+        GOD: 1200 # total number of samples across sessions
+
+# ========path========
+h5_root: ../../../dataset/ssl_dataset/sbj1_3/{h5_name}
+resume_path: null
+
+# ========training========
+training: 
+    precision: 16
+    val_check_interval: 10
+    num_workers: 4 # 4
+    batch_size: 100
+    lr: 2.5e-4
+    min_lr: 0
+    weight_decay: 0.05
+    num_epoch: 500
+    warmup_epochs: 40
+    clip_grad: 0.8
+    accum_iter: 1
+    mask_ratio: 0.75
+    
+    logdir: '../../results_ssl/sbj1_3/{exp_name}/log'
+    ckpt_dir: '../../results_ssl/sbj1_3/{exp_name}/ckpt'
+    reconst_fig_dir: '../../results_ssl/sbj1_3/{exp_name}/reconst_fig'

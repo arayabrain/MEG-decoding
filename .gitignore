@@ -26,6 +26,7 @@ data/Gwilliams2022/
 !data/Gwilliams2022/.gitkeep
 data/gwilliams2022_proto.py
 data/movies/
+data/movies_bu/
 
 # Run outputs and temp files
 outputs/

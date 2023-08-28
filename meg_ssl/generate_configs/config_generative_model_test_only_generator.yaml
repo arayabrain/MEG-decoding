@@ -25,7 +25,7 @@ total_limit:
 # ========path========
 h5_root: ../../../dataset/ssl_dataset/{h5_name}
 resume_path: null
-meg_encoder_path: '../../results_ssl/{exp_name}/ckpt/best.pth' #
+meg_encoder_path: '../../results_ssl/{sbj_name}/{exp_name}/ckpt/best.pth' #
 image_encoder_path: null # null is allowed
 pretrain_gm_path: ../dreamdiffusion/pretrains
 
@@ -58,7 +58,7 @@ training:
     model_meta: null
     checkpoint_path: null
     allow_full_validation: False
-    trainable_cond_model: True
+    trainable_cond_model: False
     trainable_generator_model: True
 
     logdir: '../../results_task/dream_diffusion/{exp_name}/log'

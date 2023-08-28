@@ -76,6 +76,8 @@ def get_dataset_info(name:str, h5_dir:str, split:str):
             video_id = session2video_id[session_id]
             part_id = session2part_id[session_id]
             ret = dataset_path(sbj, video_id, part_id, h5_dir, split)
+            if ret is None:
+                continue
             dataset_info_list.append(ret)
     print('=================GOD=================')
     print(name)
@@ -83,19 +85,27 @@ def get_dataset_info(name:str, h5_dir:str, split:str):
     print('=====================================')
     return dataset_info_list
 
-def dataset_path(sbj:int, video_id:int, part_id:int, h5_dir:str, split:str):
-    sbj = 'sbj{}'.format(str(sbj).zfill(2))
+def dataset_path(sbj:str, video_id:int, part_id:int, h5_dir:str, split:str):
     movie_name = movie_file_list[video_id-1].format(part_id=part_id)
     session_name = movie_name.replace('.mp4', '.mat')
-
     # 例外処理: 先方のmatファイル作成時のタイポ
-    if video_id == 2: 
-        session_name = session_name.replace('_id2_', '_id1_')
-    if video_id == 8:
-        if part_id < 6:
-            session_name = session_name.replace('Vol1-1', 'Vol1_1')
-        else:
-            session_name = session_name.replace('Vol1-1', 'vol1-1')
+    assert isinstance(sbj, str), '{} is not string'.format(sbj)
+    if int(sbj) == 1:
+        if video_id == 2: 
+            session_name = session_name.replace('_id2_', '_id1_')
+        if video_id == 8:
+            if part_id < 6:
+                session_name = session_name.replace('Vol1-1', 'Vol1_1')
+            else:
+                session_name = session_name.replace('Vol1-1', 'vol1-1')
+    if int(sbj) == 3:
+        if video_id >= 5:
+            session_name = session_name.replace('Vol1-', 'Vol1_')
+        if video_id == 8 and part_id == 5:
+            print(f'sbj{sbj}, video_id:{video_id}, part_id:{part_id} does not exists. skip')
+            return None
+                
+    sbj = 'sbj{}'.format(str(sbj).zfill(2))
     ret = {
         'meg_path': processed_meg_path_pattern.format(sub=sbj, session_name=session_name),
         'movie_path': os.path.join(VIDEO_ROOT, movie_name),

@@ -100,6 +100,28 @@ class DiffusionTrainer(BaseSSLTrainer):
         self.val_loader = DataLoader(val_dataset, batch_size=self.config.batch_size, shuffle=False, num_workers=self.num_workers, collate_fn=collate_fn)
         self.best_acc = 0# np.inf
         self.reconst_dir = os.path.join(self.config.reconst_dir, 'val')
+
+        assert self.config.trainable_cond_model or self.config.trainable_generator_model
+
+
+        if self.config.trainable_generator_model:
+            self.generator.train_cond_stage_only = True
+            self.generator.unfreeze_whole_model()
+            self.generator.freeze_first_stage()
+            print('generator is trainable but first stage model')
+        else:
+            self.generator.freeze_whole_model()
+            print('generator is frozen')
+
+        if self.config.trainable_cond_model:
+            self.generator.cond_stage_trainable = True
+            self.generator.unfreeze_cond_stage()
+            print('meg encoder is trainable')
+        else:
+            self.generator.freeze_cond_stage()
+            print('meg encoder is frozen')
+
+        
         os.makedirs(self.reconst_dir, exist_ok=True)
         self.other_setup()
 
@@ -115,8 +137,12 @@ class DiffusionTrainer(BaseSSLTrainer):
 
     def train_one_epoch(self, epoch:int)->dict:
         self.generator.train()
-        self.generator.encode_first_stage.eval() # image encoderは、trainingの対象外
-        self.generator.cond_stage_model.train()
+        self.generator.first_stage_model.eval() # image encoderは、trainingの対象外
+        if self.config.trainable_cond_model:
+            self.generator.cond_stage_model.train()
+        else:
+            self.generator.cond_stage_model.eval()
+
         loss_logs = {}
         with tqdm.tqdm(self.train_loader) as pbar:
             for step, batch in enumerate(pbar):
@@ -160,14 +186,14 @@ class DiffusionTrainer(BaseSSLTrainer):
 
     def validation(self, epoch:int)->dict:
         self.generator.eval()
-        self.generator.encode_first_stage.eval()
+        self.generator.first_stage_model.eval()
         self.generator.cond_stage_model.eval()
         metrics_logs = {}
-        limit=5
+        limit=3
         with torch.no_grad():
             for step, batch in enumerate(self.val_loader):
                 metrics, grid_imgs = self.val_one_step(step, batch, limit=limit)
-                self.update_loss_logs(metrics, metrics_logs, prefix='')
+                self.update_loss_logs(metrics, metrics_logs, prefix=None)
                 if step == 0:
                     savefile = os.path.join(self.reconst_dir, f'test-{epoch}.png')
                     grid_imgs.save(savefile)
@@ -179,7 +205,7 @@ class DiffusionTrainer(BaseSSLTrainer):
                         pass
                     else:
                         break # take so much time
-
+        # import pdb; pdb.set_trace()
         metrics_logs = {key: np.mean(value) for key, value in metrics_logs.items()}
         print(metrics_logs)
         return metrics_logs
@@ -187,10 +213,14 @@ class DiffusionTrainer(BaseSSLTrainer):
     @torch.no_grad()
     def val_one_step(self, step, batch, limit=5)->float:
         # generate
-        grid, all_samples, state = self.generator.generate(batch, ddim_steps=self.generator.ddim_steps, num_samples=3, limit=limit)
+        grid, all_samples, state = self.generator.generate(batch, 
+                                                           ddim_steps=self.generator.ddim_steps, 
+                                                           num_samples=1, 
+                                                           limit=limit)
         #
-        metric, metric_list = self.get_eval_metric(all_samples, avg=self.eval_avg)
+        metric, metric_list = self.generator.get_eval_metric(all_samples, avg=self.config.eval_avg)
         grid_imgs = Image.fromarray(grid.astype(np.uint8))
+        # import pdb; pdb.set_trace()
         metric_dict = {f'val/{k}':v for k, v in zip(metric_list, metric)}
 
         return metric_dict, grid_imgs
@@ -207,7 +237,7 @@ class DiffusionTrainer(BaseSSLTrainer):
             self.pkl_logger.log(train_metrics, 'train')
             # validation
             if epoch % self.val_check_interval == 0:
-                val_metrics, grid_imgs = self.validation(epoch)
+                val_metrics = self.validation(epoch)
                 val_metrics.update({'epoch':epoch})
                 # logging
                 self.pkl_logger.log(val_metrics, 'val')
