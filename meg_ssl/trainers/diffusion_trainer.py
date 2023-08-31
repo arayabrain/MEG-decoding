@@ -105,7 +105,7 @@ class DiffusionTrainer(BaseSSLTrainer):
 
 
         if self.config.trainable_generator_model:
-            self.generator.train_cond_stage_only = True
+            self.generator.train_cond_stage_only = False
             self.generator.unfreeze_whole_model()
             self.generator.freeze_first_stage()
             print('generator is trainable but first stage model')
@@ -118,6 +118,7 @@ class DiffusionTrainer(BaseSSLTrainer):
             self.generator.unfreeze_cond_stage()
             print('meg encoder is trainable')
         else:
+            self.generator.cond_stage_trainable = False
             self.generator.freeze_cond_stage()
             print('meg encoder is frozen')
 
@@ -246,7 +247,7 @@ class DiffusionTrainer(BaseSSLTrainer):
                     self.best_acc = val_metrics['val/top-1-class (max)']
                     print('!! best top-1-class (max) is updated to ', self.best_acc)
                     self.save_model('best.pth')
-
+                self.save_model('current.pth')
                 train_metrics.update(val_metrics)
             if self.usewandb:
                 wandb.log(train_metrics)

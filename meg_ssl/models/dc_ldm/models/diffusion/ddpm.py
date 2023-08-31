@@ -485,6 +485,16 @@ class DDPM(pl.LightningModule):
             if metric[-1] > self.run_full_validation_threshold:
                 self.full_validation(batch, state=state)
         self.validation_count += 1
+        torch.save(
+                {
+                    'model_state_dict': self.state_dict(),
+                    'config': self.main_config,
+                    'state': state
+
+                },
+                os.path.join(self.output_path, 'checkpoint_current.pth')
+            )
+        print('model is saved as ', os.path.join(self.output_path, 'checkpoint_current.pth'))
 
     def get_eval_metric(self, samples, avg=True):
         metric_list = ['mse', 'pcc', 'ssim', 'psm']

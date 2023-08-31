@@ -78,6 +78,7 @@ class SessionDatasetDrama(Dataset):
         # baseline|meg_frame|meg_onset|meg_duration
 
         self.prepare_data()
+        self.deterministic = False
 
 
 
@@ -85,7 +86,8 @@ class SessionDatasetDrama(Dataset):
         return len(self.indices)
 
     def __getitem__(self, idx:int)->Tuple:
-        target_idx = self.indices[idx] + random.randint(0, self.n_triggers_per_section - 1) # jitter
+        jitter_idx = 0 if self.deterministic else  random.randint(0, self.n_triggers_per_section - 1)
+        target_idx = self.indices[idx]  + jitter_idx # + random.randint(0, self.n_triggers_per_section - 1)
         movie_frame = self.movie_triggers[target_idx]
         meg_frame = self.meg_triggers[target_idx]
         baseline_frame = meg_frame - self.baseline_duration_frames

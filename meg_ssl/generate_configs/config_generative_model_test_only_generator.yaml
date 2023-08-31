@@ -9,7 +9,7 @@ preprocess: base
 dataset_name:
     train:
         # drama: sbj_1-session_all # all 1_3, 1~3
-        GOD: sbj_1-train-session_1 # _2_3_4_5_7_8_9_10_11
+        GOD: sbj_1-train-session_1_2_7_8 # _2_3_4_5_7_8_9_10_11
     val:
         GOD: sbj_1-train-session_6 # _12
 dataset_yaml:
