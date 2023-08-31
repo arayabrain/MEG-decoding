@@ -79,7 +79,7 @@ def get_dataset_info(name:str, h5_dir:str, split:str):
             if ret is None:
                 continue
             dataset_info_list.append(ret)
-    print('=================GOD=================')
+    print('=================drama=================')
     print(name)
     print('dataset_info_list: ', dataset_info_list)
     print('=====================================')
@@ -91,7 +91,7 @@ def dataset_path(sbj:str, video_id:int, part_id:int, h5_dir:str, split:str):
     # 例外処理: 先方のmatファイル作成時のタイポ
     assert isinstance(sbj, str), '{} is not string'.format(sbj)
     if int(sbj) == 1:
-        if video_id == 2: 
+        if video_id == 2:
             session_name = session_name.replace('_id2_', '_id1_')
         if video_id == 8:
             if part_id < 6:
@@ -104,7 +104,7 @@ def dataset_path(sbj:str, video_id:int, part_id:int, h5_dir:str, split:str):
         if video_id == 8 and part_id == 5:
             print(f'sbj{sbj}, video_id:{video_id}, part_id:{part_id} does not exists. skip')
             return None
-                
+
     sbj = 'sbj{}'.format(str(sbj).zfill(2))
     ret = {
         'meg_path': processed_meg_path_pattern.format(sub=sbj, session_name=session_name),

@@ -85,7 +85,7 @@ class SessionDatasetDrama(Dataset):
         return len(self.indices)
 
     def __getitem__(self, idx:int)->Tuple:
-        target_idx = self.indices[idx] + random.randint(0, self.n_triggers_per_section - 1)
+        target_idx = self.indices[idx] + random.randint(0, self.n_triggers_per_section - 1) # jitter
         movie_frame = self.movie_triggers[target_idx]
         meg_frame = self.meg_triggers[target_idx]
         baseline_frame = meg_frame - self.baseline_duration_frames
@@ -101,7 +101,7 @@ class SessionDatasetDrama(Dataset):
         if np.isnan(ROI_MEG_Data.sum()):
             # sbj01_ID08_DreamGirlsVol1-1_id8_MEG_DATAPixx_part4 13ch-22chが0
             print('While handling {} (MEG file), following exception occur.'.format(self.meg_path))
-            raise Exception('nan is detected.')  
+            raise Exception('nan is detected.')
         ROI_MEG_Data -= np.mean(ROI_MEG_Data[:, :self.baseline_duration_frames], axis=1)[:, np.newaxis] # baseline correction
         ROI_MEG_Data = ROI_MEG_Data[:, -self.meg_duration_frames:] # ROI_MEG_Data[:, self.meg_onset_frames:] # remove before onset
         if self.clamp is not None:
@@ -156,12 +156,12 @@ class SessionDatasetDrama(Dataset):
         # CAR -> (src_reconst) -> bandpass filter -> resample
         # 前処理してh5ファイルにする
         MEG_Data:np.ndarray = self.get_meg_matlab_data(self.meg_path)
-        # plt.plot(MEG_Data[[128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154], 
+        # plt.plot(MEG_Data[[128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154],
         #                   11000:12000].T)
         # plt.savefig(self.h5_file_name.replace('.h5', '_a.png'))
         # plt.close()
         # MEG_Data = car_epoch(MEG_Data) # common average reference by time ここでやるとトリガーも入ってしまう
-        # plt.plot(MEG_Data[[128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154], 
+        # plt.plot(MEG_Data[[128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154],
         #                   11000:12000].T)
         # plt.savefig(self.h5_file_name.replace('.h5', '_b.png'))
         # plt.close()
@@ -266,16 +266,16 @@ if __name__ == '__main__':
         main_cfg = compose(config_name)
     with initialize(config_path="../../meg_ssl/ssl_configs/dataset"):
         dataset_config = compose('drama/drama_vc').drama
-    
+
     preproc_config = main_cfg.preprocess
     dataset_infos = get_dataset_info('sbj_1-session_1~3', '/home/yainoue/meg2image/codes/MEG-decoding/tmps', 'train')
     dataset_info = dataset_infos[0]
     dataset = SessionDatasetDrama(dataset_config, preproc_config, dataset_info['meg_path'], dataset_info['movie_path'],
                                    dataset_info['movie_trigger_path'], dataset_info['meg_trigger_path'], dataset_info['h5_file_name'],
-                                   dataset_info['movie_crop_pts'], sbj_name=dataset_info['sbj_name'], split=dataset_info['split'], 
+                                   dataset_info['movie_crop_pts'], sbj_name=dataset_info['sbj_name'], split=dataset_info['split'],
                                    num_trial_limit=100, image_preprocs=[], meg_preprocs=[],
                                    only_meg=True, on_memory=False)
-    
+
 
     with h5py.File(dataset.h5_file_name, "r") as h5:
         ROI_MEG_Data = h5['ROI_MEG_Data'][:,:] # ndim =2
@@ -284,4 +284,3 @@ if __name__ == '__main__':
     plt.savefig(dataset.h5_file_name.replace('.h5', '.png'))
     plt.close()
     print('save to ', dataset.h5_file_name.replace('.h5', '.png'))
-    

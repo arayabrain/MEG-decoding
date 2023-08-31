@@ -44,11 +44,16 @@ class CFGBase():
         '2-vc': {'drama': 'drama/drama_vc.yaml', 'GOD': 'GOD/god_vc.yaml'},
         '3-vc': {'drama': 'drama/drama_vc.yaml', 'GOD': 'GOD/god_vc.yaml'},
     }
+    total_limit_dict = {
+        '1': {'train': {'drama': 100}, 'val': {'GOD': 1200}},
+        '2': {'train': {'drama': 100}, 'val': {'GOD': 1200}},
+        '3': {'train': {'drama': 100}, 'val': {'GOD': 1200}},
+    }
 
 
     def __init__(self, sbj_name:str, roi, fs, duration):
         self.dataset_name =self.eval_dataset_name_dict[sbj_name]
-        self.total_limit = 100
+        self.total_limit = self.total_limit_dict[sbj_name]
         self.h5_root = self.h5_root_dict[sbj_name].format(roi=roi, fs=fs, duration=duration)
         self.dataset_yaml = self.dataset_yaml_names_dict[f'{sbj_name}-{roi}']
 
