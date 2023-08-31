@@ -163,7 +163,7 @@ class MAEforEEG(nn.Module):
         Per-sample shuffling is done by argsort random noise.
         x: [N, L, D], sequence
         """
-        N, L, D = x.shape  # batch, length, dim
+        N, L, D = x.shape  # batch, length, dim <- こうなっていない可能性がある（つまり空間方向の補完になっている）
         len_keep = int(L * (1 - mask_ratio))
 
         if self.focus_range is not None:
@@ -197,7 +197,7 @@ class MAEforEEG(nn.Module):
 
     def forward_encoder(self, x, mask_ratio, global_pool=False):
         # embed patches
-        x = self.patch_embed(x)
+        x = self.patch_embed(x)# batch x n_electrodes x time -> batch x time/patch x 1024  (Conv1D and transpose) 
 
         # add pos embed w/o cls token
         x = x + self.pos_embed[:, 1:, :]

@@ -9,24 +9,32 @@ def linear_interpolate(data:torch.Tensor, mask:torch.Tensor):
     pred_data[mask,:] = -1
 
 
-def polynomial_interpolate(data:np.ndarray, mask:np.ndarray, order=3):
-    # data: (n, L, c)
+def polynomial_interpolate(data:np.ndarray, mask:np.ndarray, patch_size, order=3):
+    # data: (n, c, L)
     # mask: (n, L)
     pred_data  = data.copy()
+    unpatched_mask_batch = []
     for n in range(len(data)):
-        for c in range(data.shape[-1]):
-            masked_data = data[n,:,c][mask[n,:]]
-            if len(masked_data) == 0:
+        unpatched_mask = np.zeros((len(mask[n])*patch_size))
+        for i, s in enumerate(np.arange(0, len(mask[n])*patch_size, patch_size)):
+            unpatched_mask[s:s+patch_size] = mask[n,i]
+        unpatched_mask_batch.append(unpatched_mask)
+        for c in range(data.shape[1]):
+            masked_x = np.where(unpatched_mask==1)[0]
+            masked_data = data[n,c,:][masked_x]
+
+            unmasked_x = np.where(unpatched_mask==0)[0]
+            unmasked_data = data[n,c,:][unmasked_x]
+            # import pdb; pdb.set_trace()
+            if len(unmasked_data) == 0:
                 continue
-            x = np.where(mask[n,:]==True)[0]
-            p = np.polyfit(x, masked_data, order)
+            p = np.polyfit(unmasked_x, unmasked_data, order)
 
-            masked_x = np.where(mask[n,:]==False)[0]
-            gt = data[n,:,c][masked_x]
             pred = np.polyval(p, masked_x)
-            pred_data[n, masked_data, c] = pred
-
-    return pred_data
+            # import pdb; pdb.set_trace()
+            pred_data[n, c, masked_x] = pred
+    # unpatched_mask_batch = np.stack(unpatched_mask_batch, axis=0)
+    return pred_data # , unpatched_mask_batch
 
 
 def patchify(imgs, patch_size):
@@ -56,19 +64,30 @@ def unpatchify(x, patch_size):
 
 def calc_loss_and_corr(gt:np.ndarray, pred:np.ndarray, mask:np.ndarray, patch_size:int=4):
     """
-    gt: [N, 1, num_voxels]
+    gt: [N, num_electrodes, num_samples]
     gt: [N, chan, T]
-    pred: [N, L, p]
-    mask: [N, L], 0 is keep, 1 is remove,
+    pred: [N, num_electrodes, num_samples] 
+    mask: [N, num_samples], 0 is keep, 1 is remove,
     """
-    gt = gt.transpose(1,2)
-    target = patchify(gt, patch_size)
+    unpatched_mask_batch = []
+    for n in range(len(gt)):
+        unpatched_mask = np.zeros((len(mask[n])*patch_size))
+        for i, s in enumerate(np.arange(0, len(mask[n])*patch_size, patch_size)):
+            unpatched_mask[s:s+patch_size] = mask[n,i]
+        unpatched_mask_batch.append(unpatched_mask)
+    mask = np.stack(unpatched_mask_batch, axis=0)
+
+    # import pdb; pdb.set_trace()
+    # gt = gt.transpose(1,2)
+    target = gt
+    # target = patchify(gt, patch_size)
     # target = gt.transpose(1,2)
     loss = (pred - target) ** 2
-    loss = loss.mean(axis=-1)  # [N, L], mean loss per patch
+    # import pdb; pdb.set_trace()
+    loss = loss.mean(axis=1)  # [N, L], mean loss per patch
     # loss = loss.mean()
     loss = (loss * mask).sum() / mask.sum()  if mask.sum() != 0 else (loss * mask).sum() # mean loss on removed patches
 
-    corr =  np.mean(np.tensor([np.corrcoef(np.stack([p[0], s[0]],axis=0))[0,1] for p, s in zip(pred, gt)]))
+    corr =  np.mean(np.array([np.corrcoef(np.stack([p[0], s[0]],axis=0))[0,1] for p, s in zip(pred, gt)]))
     return loss, corr
 

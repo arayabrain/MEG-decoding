@@ -99,17 +99,22 @@ def get_model_and_trainer_from_cfg(cfg):
 
 
 
-def first_setting(cfg, fs, duration):
+def first_setting(cfg, fs, duration, manual_setting=True):
     with initialize(config_path="../meg_ssl/ssl_configs/preprocess"):
         cfg.preprocess = compose(config_name=f'fs{fs}_dura{duration}')
 
-    # get dataset
-    train_dataset, _ = get_dataset(cfg)
+    if manual_setting:
+        cfg.model.parameters.time_len = 208
+        cfg.model.parameters.in_chans = 22
+    else:
+        # get dataset
+        train_dataset, _ = get_dataset(cfg)
 
-    # cfg tuning
-    cfg.model.parameters.time_len = int(np.floor(cfg.preprocess.meg_duration * cfg.preprocess.brain_resample_rate))
-    cfg.model.parameters.in_chans = train_dataset.datasets[0].num_electrodes
-
+        # cfg tuning
+        cfg.model.parameters.time_len = int(np.floor(cfg.preprocess.meg_duration * cfg.preprocess.brain_resample_rate))
+        cfg.model.parameters.in_chans = train_dataset.datasets[0].num_electrodes
+        print('first settings: time_len', cfg.model.parameters.time_len)
+        print('first settings: in_chans', cfg.model.parameters.in_chans)
     return cfg
 
 
@@ -121,24 +126,23 @@ def eval_one_condition(dataloader, model, config, order, save_image=False):
     corr_list = []
     for i, batch in enumerate(dataloader):
         data = batch
-        mask = model.random_masking(data, mask_ratio)
+        _, mask, _ = model.random_masking(torch.zeros([data.shape[0], int(data.shape[2]/4), 1024]), mask_ratio)
 
         data = data.detach().cpu().numpy()
         mask = mask.detach().cpu().numpy()
-
-        pred_data = polynomial_interpolate(data, mask, order)
+        pred_data = polynomial_interpolate(data, mask, patch_size, order)
         loss, corr = calc_loss_and_corr(data, pred_data, mask, patch_size)
         loss_list.append(loss)
         corr_list.append(corr)
         if save_image:
             if i > 0:
                 continue
-            unpatch_data = unpatchify(data, patch_size)
-            unpatch_pred = unpatchify(pred_data, patch_size)
+            unpatch_data = data # unpatchify(data, patch_size)
+            unpatch_pred = pred_data # unpatchify(pred_data, patch_size)
             fig, axes = plt.subplots(nrows=5, figsize=(10, 10))
             for c in range(5):
-                axes[c].plot(np.arange(len(unpatch_data[0,0,:])), unpatch_data[c], label='original')
-                axes[c].plot(np.arange(len(unpatch_data[0,0,:])), unpatch_pred[c], label='interpolated')
+                axes[c].plot(np.arange(len(unpatch_data[0,0,:])), unpatch_data[0,c], label='original')
+                axes[c].plot(np.arange(len(unpatch_data[0,0,:])), unpatch_pred[0,c], label='interpolated')
                 axes[c].legend()
             plt.savefig('tmp_conventional_reconst.png')
 
