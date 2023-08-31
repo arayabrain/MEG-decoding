@@ -5,16 +5,18 @@ from omegaconf import OmegaConf
 import numpy as np
 from torch.utils.data import DataLoader
 import torch
+import matplotlib.pyplot as plt
 
 import sys
-sys.path.append('..')
+sys.path.append('.')
 from meg_ssl.dataclass import parse_dataset
 from meg_ssl.models import get_model_and_trainer
-
+plt.rcParams["font.size"] = 16
 
 class EvalSettings:
     trained_sbj = ['1', '3', '1_3']
     eval_sbj = ['1', '2', '3']
+    num_samples = ['', '-10k', '-5k', '-2.5k', '-1k'] # roi等の情報も含める場合がある
     device = 'cuda'
     fs = 1000
     duration = 200
@@ -23,7 +25,12 @@ class EvalSettings:
     # durations = [200]
     model_names = ['best', 'last'] # 'last'
     result_root = '../../results_ssl/'
-    ckpt_pattern = 'sbj{sbj_name}/scmbm_{patch_size}-fs{fs}-dura{duration}/ckpt/{model_name}.pth'
+    ckpt_pattern = 'sbj{sbj_name}/scmbm_{patch_size}-fs{fs}-dura{duration}{n_sample}/ckpt/{model_name}.pth'
+    n_samples_replace_dict = {
+        '1': {'all': 31200, '-1k': 1000, '-2.5k': 2500, '-5k': 5000, '-10k':10000},
+        '3': {'all': 31200, '-1k': 1000, '-2.5k': 2500, '-5k': 5000, '-10k':10000},
+        '1_3': {'all': 62300, '-1k': 1000, '-2.5k': 2500, '-5k': 5000, '-10k':10000}
+    }
 
 class CFGBase():
     eval_dataset_name_dict ={
@@ -44,17 +51,22 @@ class CFGBase():
         '2-vc': {'drama': 'drama/drama_vc.yaml', 'GOD': 'GOD/god_vc.yaml'},
         '3-vc': {'drama': 'drama/drama_vc.yaml', 'GOD': 'GOD/god_vc.yaml'},
     }
+    total_limit_dict = {
+        '1': {'train': {'drama': 100}, 'val': {'GOD': 1200}},
+        '2': {'train': {'drama': 100}, 'val': {'GOD': 1200}},
+        '3': {'train': {'drama': 100}, 'val': {'GOD': 1200}},
+    }
 
 
     def __init__(self, sbj_name:str, roi, fs, duration):
         self.dataset_name =self.eval_dataset_name_dict[sbj_name]
-        self.total_limit = 100
+        self.total_limit = self.total_limit_dict[sbj_name]
+
         self.h5_root = self.h5_root_dict[sbj_name].format(roi=roi, fs=fs, duration=duration)
         self.dataset_yaml = self.dataset_yaml_names_dict[f'{sbj_name}-{roi}']
 
         with initialize(config_path="../meg_ssl/ssl_configs/preprocess"):
-            self.preprocess = compose(config_name='base')
-
+            self.preprocess = compose(config_name=f'fs{fs}_dura{duration}')
 
 
 def get_config(config_name):
@@ -62,62 +74,10 @@ def get_config(config_name):
         cfg = compose(config_name=config_name)
     print('read config: ', config_name)
 
-    cfg.training.logdir = None
-    cfg.training.ckpt_dir = None
-    cfg.training.reconst_fig_dir = None
+    cfg.training.logdir = 'tmps/eval/log_dummy'
+    cfg.training.ckpt_dir = 'tmps/eval/ckpt_dummy'
+    cfg.training.reconst_fig_dir = 'tmps/eval/reconst_dummy'
     return cfg
-
-
-def get_dataset(cfg):
-    dataset_names:dict = cfg.dataset_name
-    # import pdb; pdb.set_trace()
-    dataset_yamls:dict = cfg.dataset_yaml
-    num_trial_limit:dict = cfg.total_limit
-    preproc_config:OmegaConf = cfg.preprocess
-    h5_root:str = cfg.h5_root
-    image_preprocs:list = []
-    meg_preprocs:list = []
-    only_meg:bool = True
-    on_memory:bool = True #False
-    dataset_dict:dict = parse_dataset(dataset_names, dataset_yamls, preproc_config, num_trial_limit,
-                                      h5_root, image_preprocs, meg_preprocs, only_meg, on_memory)
-
-    return dataset_dict['val']
-
-
-def get_model_and_trainer(cfg):
-    meg_encoder, trainer = get_model_and_trainer(cfg, device_count=1, usewandb=False, only_model=False)
-    return meg_encoder, trainer
-
-
-
-def first_setting(cfg):
-    # get dataset
-    train_dataset, val_dataset = get_dataset(cfg)
-
-    # cfg tuning
-    cfg.model.parameters.time_len = int(np.floor(cfg.preprocess.meg_duration * cfg.preprocess.brain_resample_rate))
-    cfg.model.parameters.in_chans = train_dataset.datasets[0].num_electrodes
-
-    # get model
-    meg_encoder, trainer = get_model_and_trainer(cfg)
-    return cfg
-
-
-
-def eval_one_condition(dataloader, model, trainer, device):
-    model.eval()
-    model.to(device)
-    trainer.device = device
-    trainer.model = model
-    trainer.val_loader = dataloader
-
-    # evaluation
-    print('=================start evaluation================')
-    ret = trainer.validation()
-    print('VAL/ loss:{:.3f},  acc:{:.3f}'.format(ret['val_loss'], ret['val_acc']))
-    return ret
-
 
 
 
@@ -127,40 +87,48 @@ def run(settings):
     dura = settings.duration # 200
     device = settings.device
 
-    # get model
-    model_base_cfg = get_config('sbj1_1k') # dummy
-    model_base_cfg = first_setting(model_base_cfg)
-    model, trainer = get_model_and_trainer(model_base_cfg)
-
-    df= {'eval_sbj': [], 'trained_sbj': [], 'model_name': [], 'val_loss': [], 'val_acc': []}
-    for e_sub in settings.eval_sbj:
-        # get dataset for validation
-        eval_sub_cfg = CFGBase(e_sub, roi, fs, dura)
-        val_dataset = get_dataset(eval_sub_cfg)
-        val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=4)
-        for t_sub in settings.trained_sbj:
-            for model_name in settings.model_names:
-                #  'sbj{sbj_name}/scmbm_{patch_size}-fs{fs}-dura{duration}/ckpt/{model_name}.pth'
-                ckpt_filename = settings.ckpt_pattern.format(sbj_name=t_sub, patch_size=4, fs=fs, duration=dura, model_name=model_name)
-                ckpt_path = os.path.join(settings.result_root, ckpt_filename)
-                print('load weight from ', ckpt_path)
-                model = model.load_state_dict(torch.load(ckpt_path))
-                ret = eval_one_condition(val_dataloader, model, trainer, device)
-
-                df['eval_sbj'].append(e_sub)
-                df['trained_sbj'].append(t_sub)
-                df['model_name'].append(model_name)
-                for key, value in ret.items():
-                    df[key] = value
-
     result_save_dir = os.path.join(settings.result_root, 'vis_scalings')
-    os.makedirs(result_save_dir, exist_ok=True)
-    savepath = os.path.join(result_save_dir, '{roi}-{fs}-{dura}-{sbj_list}.csv'.format(roi=roi, fs=fs, dura=dura, sbj_list='_'.join(settings.eval_sbj)))
+    result_save_dir = os.path.join(settings.result_root, 'vis_scalings')
+    csvpath = os.path.join(result_save_dir, '{roi}-{fs}-{dura}-{sbj_list}.csv'.format(roi=roi, fs=fs, dura=dura, sbj_list='_'.join(settings.eval_sbj)))
+    df = pd.read_csv(csvpath)
+    df = df.fillna('all')
+    fig, axes = plt.subplots(nrows=2, ncols=len(settings.eval_sbj), figsize=(24, 12))
+    for i, e_sub in enumerate(settings.eval_sbj):
+        e_sub_df = df.query('eval_sbj=={}'.format(e_sub))
+        for t_sub in settings.trained_sbj:
+            t_sub_df = e_sub_df.query('trained_sbj=="{}"'.format(t_sub))
+            # print(t_sub, settings.n_samples_replace_dict[t_sub])
+            # import pdb; pdb.set_trace()
+            t_sub_df = t_sub_df.replace({'n_sample': settings.n_samples_replace_dict[t_sub]})
+            t_sub_df = t_sub_df.sort_values(by='n_sample', axis=0)
+            # best
+            # best_df = t_sub_df.query('model_name=="best"')
+            # x = best_df['n_sample'].to_list()
+            # loss = best_df['val_loss'].to_list()
+            # corr = best_df['val_corr'].to_list()
+            # axes[0, i].plot(x, loss, '-o', label=f'{t_sub}-best')
+            # axes[1, i].plot(x, corr, '-o', label=f'{t_sub}-best')
+            # import pdb; pdb.set_trace()
+            # last
+            last_df = t_sub_df.query('model_name=="last"')
+            x = last_df['n_sample'].to_list()
+            loss = last_df['val_loss'].to_list()
+            corr = last_df['val_corr'].to_list()
+            axes[0, i].plot(x, loss, label=f'{t_sub}-last')
+            axes[1, i].plot(x, corr, label=f'{t_sub}-last')
+        axes[0,i].legend()
+        axes[1,i].legend()
+        axes[0,i].set_ylabel('test loss (sbj: {})'.format(e_sub))
+        axes[1,i].set_ylabel('test corr (sbj: {})'.format(e_sub))
+        axes[0,i].set_xlabel('num samples (log)')
+        axes[1,i].set_xlabel('num samples (log)')
 
-    df = pd.DataFrame(df)
-    df.to_csv(savepath)
-    print('DataFrame is saved to ', savepath)
+        axes[0,i].set_xscale('log')
+        axes[1,i].set_xscale('log')
 
+    pngpath = os.path.join(csvpath.replace('.csv', 'last.png'))
+    plt.savefig(pngpath,bbox_inches="tight")
+    print('save image as ', pngpath)
 
 if __name__ == '__main__':
     settings = EvalSettings()

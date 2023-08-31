@@ -184,7 +184,7 @@ python meg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config co
 
 python meg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config config_generative_model_test_only_generator --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200-1k --meg_h5name vc-fs1000-dura200-2 --device_counts 1 --ldf_exp test_gen-1k --datadir sbj1
 
-python meg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config config_generative_model_test_only_generator --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200-5k --meg_h5name vc-fs1000-dura200-1 --device_counts 1 --ldf_exp test_gen-5k --datadir sbj1
+python meg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config config_generative_model_test_only_generator --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200-5k --meg_h5name vc-fs1000-dura200-3 --device_counts 1 --ldf_exp test_gen-5k --datadir sbj1
 
 python meg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config config_generative_model_test_only_generator --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200-10k --meg_h5name vc-fs1000-dura200-1 --device_counts 1 --ldf_exp test_gen-10k --datadir sbj1
 
@@ -192,12 +192,17 @@ python meg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config co
 
 ### only generator
 #### MEG Encoder all
-python meg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config config_generative_model_test_only_generator --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200 --meg_h5name vc-fs1000-dura200-2 --device_counts 1 --ldf_exp test_gen 
+python meg_ldm.py --dataset MEG  --num_epoch 100 --batch_size 4  --meg_config config_generative_model_test_only_generator --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200 --meg_h5name vc-fs1000-dura200-2 --device_counts 1 --ldf_exp test_gen 
 #### MEG Encoder 1k
-python meg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config config_generative_model_test_only_generator --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200-1k --meg_h5name vc-fs1000-dura200-2 --device_counts 1 --ldf_exp test_gen-1k 
+python meg_ldm.py --dataset MEG  --num_epoch 100 --batch_size 4  --meg_config config_generative_model_test_only_generator --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200-1k --meg_h5name vc-fs1000-dura200-1 --device_counts 1 --ldf_exp test_gen-1k 
 
 #### MEG Encoder 5k
-python meg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config config_generative_model_test_only_generator --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200-5k --meg_h5name vc-fs1000-dura200-2 --device_counts 1 --ldf_exp test_gen-5k 
+python meg_ldm.py --dataset MEG  --num_epoch 100 --batch_size 4  --meg_config config_generative_model_test_only_generator --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200-5k --meg_h5name vc-fs1000-dura200-2 --device_counts 1 --ldf_exp test_gen-5k 
+
+#### evaluate
+python meg_ldm_generate.py --dataset MEG  --meg_config config_generative_model_test_only_generator --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200-5k --meg_h5name vc-fs1000-dura200-2 --device_counts 1 --ldf_exp test_gen-5k 
+
+
 
 ## ROI=ALL
 `train_ssl.py --config sbj1_all_all --model scmbm --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200-roi_all --h5name fs1000-dura200-roi_all-1 --wandbkey /home/yainoue/wandb_inoue.txt`
@@ -216,6 +221,8 @@ python meg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config co
 `train_ssl.py --config sbj1_frontal_5k --model scmbm --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200-roi_frontal-5k --h5name fs1000-dura200-roi_frontal-1 --wandbkey /home/yainoue/wandb_inoue.txt`
 
 `train_ssl.py --config sbj1_frontal_2.5k --model scmbm --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200-roi_frontal-2.5k --h5name fs1000-dura200-roi_frontal-2 --wandbkey /home/yainoue/wandb_inoue.txt`
+
+`train_ssl.py --config sbj1_frontal_1k --model scmbm --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200-roi_frontal-1k --h5name fs1000-dura200-roi_frontal-2 --wandbkey /home/yainoue/wandb_inoue.txt`
 
 ## SEED change
 `python train_ssl.py --config sbj1_10k --model scmbm --preprocess fs1000_dura500 --device_counts 1 --wandbkey /home/yainoue/wandb_inoue.txt  --exp scmbm_4-fs1000-dura500-10k-seed_0 --h5name vc-fs1000-dura200-3 --seed 0`

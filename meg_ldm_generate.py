@@ -172,6 +172,14 @@ def get_dataset(cfg):
     ])
     return DiffusionDataset(dataset_dict['train'], img_transform_train), DiffusionDataset(dataset_dict['val'], img_transform_test)
 
+def image_reconstruction(model, dataset:torch.utils.data.Dataset, state, num_samples:int, savedir:str):
+    for i, batch in enumerate(dataset):
+        grid, array, state = model.generate(batch, num_samples, ddim_steps=50, HW=None, limit=5, state=state)
+        savefile_path = os.path.join(savedir, f'{i}.png')
+        image = Image.fromarray(array)
+        image.save(savefile_path)
+        break
+
 
 def main(config, args):
     train_dataset, val_dataset = get_dataset(config)
@@ -204,36 +212,21 @@ def main(config, args):
     # generative_model.freeze_whole_model()
     # generative_model.unfreeze_cond_stage()
     generative_model.train_cond_stage_only = False # True
+    
+    # load model weight
+    weightpath = os.path.join(f'../../results_task/dream_diffusion/{args.meg_exp}-{args.ldf_exp}/ckpt/best-meg_enc.pth')
+    model_info = torch.load(weightpath)
+    print('pretrained model is loaded from ', weightpath)
+    generative_model.load_state_dict(model_info['model_state_dict'])
+    state = model_info['state']
+    # generate
+    savedir = os.path.join(f'../../results_task/dream_diffusion/{args.meg_exp}-{args.ldf_exp}/reconst/eval')
+    os.makedirs(savedir, exist_ok=True)
+    num_samples = 3
 
-
-    # diffusion trainer
-    if args.wandb_key_path is not None:
-        usewandb=True
-        with open(args.wandb_key_path, 'r') as f:
-            wandb_key = f.read()
-            wandb_key = wandb_key.split('\n')[0]
-        wandb.login(key = f'{wandb_key}')
-        # wandb.init(project='llm_hackason-'+args.config)
-        # wandb.init(project='llm_hackason-new_prompt')
-        wandb.init(project='meg-difusion')
-    else:
-        usewandb=False
-    config.training.num_epoch = args.num_epoch
-    trainer = DiffusionTrainer(config.training, args.device_counts, usewandb)
-    # fit
-    trainer.fit(generative_model, [], train_dataset, val_dataset)
-
-    # save the last model
-    torch.save(
-        {
-            'model_state_dict': generative_model.state_dict(),
-            'config': generative_model.main_config,
-            'state': None
-
-        },
-        os.path.join(generative_model.output_path, 'checkpoint_last.pth')
-    )
-
+    image_reconstruction(generative_model, val_dataset, state, num_samples, savedir)
+    print('end')
+     
 
 
 if __name__ == '__main__':

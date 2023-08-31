@@ -79,7 +79,7 @@ def get_dataset_info(name:str, h5_dir:str, split:str):
             if ret is None:
                 continue
             dataset_info_list.append(ret)
-    print('=================GOD=================')
+    print('=================drama=================')
     print(name)
     print('dataset_info_list: ', dataset_info_list)
     print('=====================================')
