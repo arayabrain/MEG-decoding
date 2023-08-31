@@ -1,5 +1,17 @@
 import torch
 import numpy as np
+from scipy import interpolate
+
+ip1 = ["最近傍点補間", lambda x, y: interpolate.interp1d(x, y, kind="nearest")]
+ip2 = ["線形補間", interpolate.interp1d]
+ip3 = ["ラグランジュ補間", interpolate.lagrange]
+ip4 = ["重心補間", interpolate.BarycentricInterpolator]
+ip5 = ["Krogh補間", interpolate.KroghInterpolator]
+ip6 = ["2次スプライン補間", lambda x, y: interpolate.interp1d(x, y, kind="quadratic")]
+ip7 = ["3次スプライン補間", lambda x, y: interpolate.interp1d(x, y, kind="cubic")]
+ip8 = ["秋間補間", interpolate.Akima1DInterpolator]
+ip9 = ["区分的 3 次エルミート補間", interpolate.PchipInterpolator]
+
 
 def linear_interpolate(data:torch.Tensor, mask:torch.Tensor):
     # data: (n, L, c)
@@ -36,6 +48,31 @@ def polynomial_interpolate(data:np.ndarray, mask:np.ndarray, patch_size, order=3
     # unpatched_mask_batch = np.stack(unpatched_mask_batch, axis=0)
     return pred_data # , unpatched_mask_batch
 
+def scipy_interpolate(data:np.ndarray, mask:np.ndarray, patch_size, methods):
+    method_name, method = methods
+    print(method_name)
+    pred_data  = data.copy()
+    unpatched_mask_batch = []
+    for n in range(len(data)):
+        unpatched_mask = np.zeros((len(mask[n])*patch_size))
+        for i, s in enumerate(np.arange(0, len(mask[n])*patch_size, patch_size)):
+            unpatched_mask[s:s+patch_size] = mask[n,i]
+        unpatched_mask_batch.append(unpatched_mask)
+        for c in range(data.shape[1]):
+            masked_x = np.where(unpatched_mask==1)[0]
+            masked_data = data[n,c,:][masked_x]
+
+            unmasked_x = np.where(unpatched_mask==0)[0]
+            unmasked_data = data[n,c,:][unmasked_x]
+            # import pdb; pdb.set_trace()
+            if len(unmasked_data) == 0:
+                continue
+
+            fitted_curve = method(unmasked_x, unmasked_data)
+            pred = fitted_curve(masked_x)
+            pred_data[n, c, masked_x] = pred
+    # unpatched_mask_batch = np.stack(unpatched_mask_batch, axis=0)
+    return pred_data # , unpatched_mask_batch
 
 def patchify(imgs, patch_size):
     """
@@ -66,7 +103,7 @@ def calc_loss_and_corr(gt:np.ndarray, pred:np.ndarray, mask:np.ndarray, patch_si
     """
     gt: [N, num_electrodes, num_samples]
     gt: [N, chan, T]
-    pred: [N, num_electrodes, num_samples] 
+    pred: [N, num_electrodes, num_samples]
     mask: [N, num_samples], 0 is keep, 1 is remove,
     """
     unpatched_mask_batch = []
