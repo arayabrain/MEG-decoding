@@ -410,6 +410,9 @@ class DDPM(pl.LightningModule):
                 print(f"rendering {num_samples} examples in {ddim_steps} steps.")
                 # c = model.get_learned_conditioning(repeat(latent, 'h w -> c h w', c=num_samples).to(self.device))
                 c, re_latent = model.get_learned_conditioning(repeat(latent, 'h w -> c h w', c=num_samples).to(self.device))
+                print(c.shape, c.max(), c.min())
+                # c = torch.rand_like(c)
+                # import pdb; pdb.set_trace()
                 samples_ddim, _ = sampler.sample(S=ddim_steps,
                                                 conditioning=c,
                                                 batch_size=num_samples,
@@ -1096,7 +1099,6 @@ class LatentDiffusion(DDPM):
             # print('DEBUG: loss', loss)
             # I dont know why, but it does not update parameters
             # print(loss)
-            import pdb; pdb.set_trace()
             total_loss = loss[0]
             self.manual_backward(total_loss)
             opt.step()
@@ -1273,7 +1275,7 @@ class LatentDiffusion(DDPM):
             target = noise
         else:
             raise NotImplementedError()
-
+        # import pdb; pdb.set_trace()
         loss_simple = self.get_loss(model_output, target, mean=False).mean([1, 2, 3])
         loss_dict.update({f'{prefix}/loss_simple': loss_simple.mean()})
 
@@ -1668,8 +1670,11 @@ class DiffusionWrapper(pl.LightningModule):
             xc = torch.cat([x] + c_concat, dim=1)
             out = self.diffusion_model(xc, t)
         elif self.conditioning_key == 'crossattn':
+            # TODO: check c_concat or c_crossattn 
+            # c_crossattn: len=1, index=0のtensorのshape:[5,77,768]
             cc = torch.cat(c_crossattn, 1)
             out = self.diffusion_model(x, t, context=cc)
+            # import pdb; pdb.set_trace()
         elif self.conditioning_key == 'hybrid':
             xc = torch.cat([x] + [c_concat], dim=1)
             cc = torch.cat([c_crossattn], dim=1)

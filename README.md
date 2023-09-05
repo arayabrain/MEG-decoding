@@ -181,7 +181,7 @@ cossim-global pool lora
 
 python meg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config config_generative_model_test --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200 --meg_h5name vc-fs1000-dura200-1 --device_counts 1 --ldf_exp test   
 
-
+## Diffusion3(only generator)
 python meg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config config_generative_model_test_only_generator --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200-1k --meg_h5name vc-fs1000-dura200-2 --device_counts 1 --ldf_exp test_gen-1k --datadir sbj1
 
 python meg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config config_generative_model_test_only_generator --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200-5k --meg_h5name vc-fs1000-dura200-3 --device_counts 1 --ldf_exp test_gen-5k --datadir sbj1
@@ -189,6 +189,11 @@ python meg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config co
 python meg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config config_generative_model_test_only_generator --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200-10k --meg_h5name vc-fs1000-dura200-1 --device_counts 1 --ldf_exp test_gen-10k --datadir sbj1
 
 python meg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config config_generative_model_test_only_generator --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200-2.5k --meg_h5name vc-fs1000-dura200-2 --device_counts 1 --ldf_exp test_gen-2.5k --datadir sbj1
+
+
+## Diffusion3(debug)
+python meg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config config_generative_model_test_only_generator --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200-1k --meg_h5name vc-fs1000-dura200-2 --device_counts 1 --ldf_exp debug --datadir sbj1
+
 
 ### only generator
 #### MEG Encoder all

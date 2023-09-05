@@ -10,32 +10,20 @@ import sys
 sys.path.append('.')
 from meg_ssl.dataclass import parse_dataset
 from meg_ssl.models import get_model_and_trainer
-from meg_ssl.utils.conventional_interpolate import scipy_interpolate, patchify, unpatchify, calc_loss_and_corr
-import matplotlib.pyplot as plt
-from scipy import interpolate
-
-ip1 = ["最近傍点補間", lambda x, y: interpolate.interp1d(x, y, kind="nearest")]
-ip2 = ["線形補間", interpolate.interp1d]
-ip3 = ["ラグランジュ補間", interpolate.lagrange]
-ip4 = ["重心補間", interpolate.BarycentricInterpolator]
-ip5 = ["Krogh補間", interpolate.KroghInterpolator]
-ip6 = ["2次スプライン補間", lambda x, y: interpolate.interp1d(x, y, kind="quadratic")]
-ip7 = ["3次スプライン補間", lambda x, y: interpolate.interp1d(x, y, kind="cubic")]
-ip8 = ["秋間補間", interpolate.Akima1DInterpolator]
-ip9 = ["区分的 3 次エルミート補間", interpolate.PchipInterpolator]
 
 
 class EvalSettings:
-    methods = [ip1, ip2, ip4, ip6, ip7, ip8, ip9]
-    eval_sbj = ['1', '2', '3']
-    num_samples = ['', '-10k', '-5k', '-2.5k', '-1k'] # roi等の情報も含める場合がある
+    trained_sbj = ['1'] # ['1', '3', '1_3']
+    eval_sbj = ['1'] # ['1', '2', '3']
+    num_samples = ['', '-10k', '-2.5k', '-1k'] #['', '-10k', '-5k', '-2.5k', '-1k'] # roi等の情報も含める場合がある
+    num_samples = ['-roi_all' + s for s in num_samples]
     device = 'cuda'
     fs = 1000
     duration = 200
-    roi = 'vc'
+    roi = 'all' # 'frontal'# 'vc'
     # fss = [1000]
     # durations = [200]
-    model_names = ['best', 'last'] # 'last'
+    model_names = ['best'] # ['best', 'last'] # 'last'
     result_root = '../../results_ssl/'
     ckpt_pattern = 'sbj{sbj_name}/scmbm_{patch_size}-fs{fs}-dura{duration}{n_sample}/ckpt/{model_name}.pth'
 
@@ -58,6 +46,12 @@ class CFGBase():
         '1-vc': {'drama': 'drama/drama_vc.yaml', 'GOD': 'GOD/god_vc.yaml'},
         '2-vc': {'drama': 'drama/drama_vc.yaml', 'GOD': 'GOD/god_vc.yaml'},
         '3-vc': {'drama': 'drama/drama_vc.yaml', 'GOD': 'GOD/god_vc.yaml'},
+        '1-frontal': {'drama': 'drama/drama_frontal.yaml', 'GOD': 'GOD/god_frontal.yaml'},
+        '2-frontal': {'drama': 'drama/drama_frontal.yaml', 'GOD': 'GOD/god_frontal.yaml'},
+        '3-frontal': {'drama': 'drama/drama_frontal.yaml', 'GOD': 'GOD/god_frontal.yaml'},
+        '1-all': {'drama': 'drama/drama_config.yaml', 'GOD': 'GOD/god_config.yaml'},
+        '2-all': {'drama': 'drama/drama_config.yaml', 'GOD': 'GOD/god_config.yaml'},
+        '3-all': {'drama': 'drama/drama_config.yaml', 'GOD': 'GOD/god_config.yaml'},
     }
     total_limit_dict = {
         '1': {'train': {'drama': 100}, 'val': {'GOD': 1200}},
@@ -110,14 +104,13 @@ def get_model_and_trainer_from_cfg(cfg):
     return meg_encoder, trainer
 
 
-
 def first_setting(cfg, fs, duration, manual_setting=True):
     with initialize(config_path="../meg_ssl/ssl_configs/preprocess"):
         cfg.preprocess = compose(config_name=f'fs{fs}_dura{duration}')
 
     if manual_setting:
         cfg.model.parameters.time_len = 208
-        cfg.model.parameters.in_chans = 22
+        cfg.model.parameters.in_chans = 145 # 36 # 22
     else:
         # get dataset
         train_dataset, _ = get_dataset(cfg)
@@ -129,39 +122,16 @@ def first_setting(cfg, fs, duration, manual_setting=True):
         print('first settings: in_chans', cfg.model.parameters.in_chans)
     return cfg
 
-
-
-def eval_one_condition(dataloader, model, config, methods, save_image=False):
-    mask_ratio = config.training.mask_ratio
-    patch_size = config.model.parameters.patch_size
-    loss_list = []
-    corr_list = []
-    for i, batch in enumerate(dataloader):
-        data = batch
-        _, mask, _ = model.random_masking(torch.zeros([data.shape[0], int(data.shape[2]/4), 1024]), mask_ratio)
-
-        data = data.detach().cpu().numpy()
-        mask = mask.detach().cpu().numpy()
-        pred_data = scipy_interpolate(data, mask, patch_size, methods)
-        loss, corr = calc_loss_and_corr(data, pred_data, mask, patch_size)
-        loss_list.append(loss)
-        corr_list.append(corr)
-        if save_image:
-            if i > 0:
-                continue
-            unpatch_data = data # unpatchify(data, patch_size)
-            unpatch_pred = pred_data # unpatchify(pred_data, patch_size)
-            fig, axes = plt.subplots(nrows=5, figsize=(10, 10))
-            for c in range(5):
-                axes[c].plot(np.arange(len(unpatch_data[0,0,:])), unpatch_data[0,c], label='original')
-                axes[c].plot(np.arange(len(unpatch_data[0,0,:])), unpatch_pred[0,c], label='interpolated')
-                axes[c].legend()
-            plt.savefig('tmp_conventional_reconst_{}.png'.format(methods[0]))
-
-    ret = {'val_loss': np.mean(loss_list), 'val_corr': np.mean(corr_list)}
+def eval_one_condition(dataloader, model, trainer, device):
+    model.eval()
+    model.to(device)
+    trainer.device = device
+    trainer.model = model
+    trainer.val_loader = dataloader
 
     # evaluation
     print('=================start evaluation================')
+    ret = trainer.validation(epoch=0)
     print('VAL/ loss:{:.3f},  corr:{:.3f}'.format(ret['val_loss'], ret['val_corr']))
     return ret
 
@@ -179,29 +149,42 @@ def run(settings):
     model_base_cfg = first_setting(model_base_cfg, fs, dura)
     model, trainer = get_model_and_trainer_from_cfg(model_base_cfg)
 
-    df= {'eval_sbj': [], 'method': [], 'model_name': [], 'val_loss': [], 'val_corr': []}
+    df= {'eval_sbj': [], 'trained_sbj': [], 'model_name': [], 'n_sample': [], 'val_loss': [], 'val_corr': []}
     for e_sub in settings.eval_sbj:
         # get dataset for validation
         eval_sub_cfg = CFGBase(e_sub, roi, fs, dura)
         train_dataset, val_dataset = get_dataset(eval_sub_cfg)
+        # TODO: train_datasetだけ値が安定しない問題。。→jitterが強制的に入っている
+        # 1: train_dataset[0].sum()= 193.4513 val_dataset[0].sum()=-342.68982
+        # 2: train_dataset[0].sum()= 193.4513 val_dataset[0].sum()=-267.06232
+        # 3: train_dataset[0].sum()= 44.667725 val_dataset[0].sum()= 259.26093
+        print('Eval Sbj: ', e_sub)
+        # print('deterministic: ', train_dataset.datasets[0].deterministic)
+        # train_dataset.datasets[0].deterministic = True
+        # import pdb; pdb.set_trace()
         # import pdb; pdb.set_trace()
         val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=1)
-        for methods in settings.methods:
-            print(methods[0])
-            for model_name in settings.model_names:
-                #  'sbj{sbj_name}/scmbm_{patch_size}-fs{fs}-dura{duration}/ckpt/{model_name}{n_sample}.pth'
-                ret = eval_one_condition(val_dataloader, model, model_base_cfg, methods, save_image=True)
+        for t_sub in settings.trained_sbj:
+            for n_sample in settings.num_samples:
+                for model_name in settings.model_names:
+                    #  'sbj{sbj_name}/scmbm_{patch_size}-fs{fs}-dura{duration}/ckpt/{model_name}{n_sample}.pth'
+                    ckpt_filename = settings.ckpt_pattern.format(sbj_name=t_sub, patch_size=4, fs=fs, duration=dura, model_name=model_name, n_sample=n_sample)
+                    ckpt_path = os.path.join(settings.result_root, ckpt_filename)
+                    print('load weight from ', ckpt_path)
+                    model.load_state_dict(torch.load(ckpt_path))
+                    ret = eval_one_condition(val_dataloader, model, trainer, device)
 
-                df['eval_sbj'].append(e_sub)
-                df['method'].append(methods[0])
-                df['model_name'].append(model_name)
-                for key, value in ret.items():
-                    df[key].append(value)
+                    df['eval_sbj'].append(e_sub)
+                    df['trained_sbj'].append(t_sub)
+                    df['model_name'].append(model_name)
+                    df['n_sample'].append(n_sample)
+                    for key, value in ret.items():
+                        df[key].append(value)
 
 
     result_save_dir = os.path.join(settings.result_root, 'vis_scalings')
     os.makedirs(result_save_dir, exist_ok=True)
-    savepath = os.path.join(result_save_dir, 'scipy-{roi}-{fs}-{dura}-{sbj_list}.csv'.format(roi=roi, fs=fs, dura=dura, sbj_list='_'.join(settings.eval_sbj)))
+    savepath = os.path.join(result_save_dir, '{roi}-{fs}-{dura}-{sbj_list}.csv'.format(roi=roi, fs=fs, dura=dura, sbj_list='_'.join(settings.eval_sbj)))
 
     df = pd.DataFrame(df)
     df.to_csv(savepath)

@@ -177,6 +177,7 @@ def main(config, args):
     train_dataset, val_dataset = get_dataset(config)
     num_voxels = int(meg_cfg.preprocess.meg_duration * meg_cfg.preprocess.brain_resample_rate) # eeg_latents_dataset_train.datasets[0].num_electrodes
     meg_encoder_pretrained_path = os.path.join(meg_cfg.meg_encoder_path.format(sbj_name=args.datadir, exp_name=args.meg_exp))
+    # import pdb;pdb.set_trace()
     meg_cfg.meg_encoder.parameters.in_chans = val_dataset.datasets[0].num_electrodes
     pretrain_mbm_metafile = {
         'model':torch.load(meg_encoder_pretrained_path),

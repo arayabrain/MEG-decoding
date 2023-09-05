@@ -5,6 +5,19 @@ import matplotlib.pyplot as plt
 
 plt.rcParams["font.size"] = 16
 
+method_name2english = {
+    '最近傍点補間': 'interp1d-nearlest',
+    '線形補間': 'interp1d',
+    '2次スプライン補間': 'quadratic spline',
+}
+
+method_name2style = {
+    '最近傍点補間': 'k-',
+    '線形補間': 'k--',
+    '2次スプライン補間': 'k:',
+
+}
+
 class EvalSettings:
     trained_sbj = ['1', '3', '1_3']
     eval_sbj = ['1', '2', '3']
@@ -23,23 +36,6 @@ class EvalSettings:
         '3': {'all': 31200, '-1k': 1000, '-2.5k': 2500, '-5k': 5000, '-10k':10000},
         '1_3': {'all': 62300, '-1k': 1000, '-2.5k': 2500, '-5k': 5000, '-10k':10000}
     }
-
-# class EvalSettings:
-#     trained_sbj = ['1'] # ['1', '3', '1_3']
-#     eval_sbj = ['1'] # ['1', '2', '3']
-#     num_samples = ['', '-10k', '-2.5k', '-1k'] #['', '-10k', '-5k', '-2.5k', '-1k'] # roi等の情報も含める場合がある
-#     num_samples = ['-roi_all' + s for s in num_samples]
-#     device = 'cuda'
-#     fs = 1000
-#     duration = 200
-#     roi = 'all' # 'frontal'# 'vc'
-#     # fss = [1000]
-#     # durations = [200]
-#     model_names = ['best'] # ['best', 'last'] # 'last'
-#     result_root = '../../results_ssl/'
-#     ckpt_pattern = 'sbj{sbj_name}/scmbm_{patch_size}-fs{fs}-dura{duration}{n_sample}/ckpt/{model_name}.pth'
-
-
 
 class CFGBase():
     eval_dataset_name_dict ={
@@ -100,9 +96,13 @@ def run(settings):
     csvpath = os.path.join(result_save_dir, '{roi}-{fs}-{dura}-{sbj_list}.csv'.format(roi=roi, fs=fs, dura=dura, sbj_list='_'.join(settings.eval_sbj)))
     df = pd.read_csv(csvpath)
     df = df.fillna('all')
+    conventional_csvpath = os.path.join(result_save_dir,  'scipy-{roi}-{fs}-{dura}-{sbj_list}.csv'.format(roi=roi, fs=fs, dura=dura, sbj_list='_'.join(settings.eval_sbj)))
+    conventional_df = pd.read_csv(conventional_csvpath)
     fig, axes = plt.subplots(nrows=2, ncols=len(settings.eval_sbj), figsize=(24, 12))
     for i, e_sub in enumerate(settings.eval_sbj):
         e_sub_df = df.query('eval_sbj=={}'.format(e_sub))
+        e_sub_conventional_df = conventional_df.query('eval_sbj=={} and model_name=="last"'.format(e_sub))
+        method_names = e_sub_conventional_df['method'].unique()
         for t_sub in settings.trained_sbj:
             t_sub_df = e_sub_df.query('trained_sbj=="{}"'.format(t_sub))
             # print(t_sub, settings.n_samples_replace_dict[t_sub])
@@ -117,13 +117,25 @@ def run(settings):
             axes[0, i].plot(x, loss, '-o', label=f'{t_sub}-best')
             axes[1, i].plot(x, corr, '-o', label=f'{t_sub}-best')
             # import pdb; pdb.set_trace()
-            # last
+            # # last
             # last_df = t_sub_df.query('model_name=="last"')
             # x = last_df['n_sample'].to_list()
             # loss = last_df['val_loss'].to_list()
             # corr = last_df['val_corr'].to_list()
             # axes[0, i].plot(x, loss, label=f'{t_sub}-last')
             # axes[1, i].plot(x, corr, label=f'{t_sub}-last')
+        for k, row in e_sub_conventional_df.iterrows():
+            method_name = row.method
+            val_loss = row.val_loss
+            val_corr = row.val_corr
+            if method_name in ['最近傍点補間', '線形補間', '2次スプライン補間']:
+                print(method_name, val_loss, val_corr)
+                style = method_name2style[method_name]
+                method_name = method_name2english[method_name]
+                axes[0,i].plot([min(x), max(x)], [val_loss]*2, style, label=method_name)
+                axes[1,i].plot([min(x), max(x)], [val_corr]*2, style, label=method_name)
+
+            # axes[0, i].plot(x)
         axes[0,i].legend()
         axes[1,i].legend()
         axes[0,i].set_ylabel('test loss (sbj: {})'.format(e_sub))
@@ -134,7 +146,7 @@ def run(settings):
         axes[0,i].set_xscale('log')
         axes[1,i].set_xscale('log')
 
-    pngpath = os.path.join(csvpath.replace('.csv', 'best.png'))
+    pngpath = os.path.join(csvpath.replace('.csv', 'best_with_conventional.png'))
     plt.savefig(pngpath,bbox_inches="tight")
     print('save image as ', pngpath)
 

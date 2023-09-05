@@ -16,5 +16,6 @@ region:
   - parietal/left
   - parietal/right
   - central/left
+  # - central/right
 # ======Fs settings======
 meg_fs: 1000

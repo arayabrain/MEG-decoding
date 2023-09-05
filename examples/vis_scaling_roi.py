@@ -6,20 +6,22 @@ import matplotlib.pyplot as plt
 plt.rcParams["font.size"] = 16
 
 class EvalSettings:
-    trained_sbj = ['1', '3', '1_3']
-    eval_sbj = ['1', '2', '3']
+    trained_sbj = ['1']
+    eval_sbj = ['1']
     num_samples = ['', '-10k', '-5k', '-2.5k', '-1k'] # roi等の情報も含める場合がある
     device = 'cuda'
     fs = 1000
     duration = 200
-    roi = 'vc'
+    roi = ['vc', 'all', 'frontal']
     # fss = [1000]
     # durations = [200]
-    model_names = ['best', 'last'] # 'last'
+    model_names = ['best'] # 'last'
     result_root = '../../results_ssl/'
     ckpt_pattern = 'sbj{sbj_name}/scmbm_{patch_size}-fs{fs}-dura{duration}{n_sample}/ckpt/{model_name}.pth'
     n_samples_replace_dict = {
-        '1': {'all': 31200, '-1k': 1000, '-2.5k': 2500, '-5k': 5000, '-10k':10000},
+        '1': {'vc':{'all': 31200, '-1k': 1000, '-2.5k': 2500, '-5k': 5000, '-10k':10000},
+              'all':{'-roi_all': 31200, '-roi_all-1k': 1000, '-roi_all-2.5k': 2500, '-roi_all-5k': 5000, '-roi_all-10k':10000},
+              'frontal':{'-roi_frontal': 31200, '-roi_frontal-1k': 1000, '-roi_frontal-2.5k': 2500, '-roi_frontal-5k': 5000, '-roi_frontal-10k':10000}},
         '3': {'all': 31200, '-1k': 1000, '-2.5k': 2500, '-5k': 5000, '-10k':10000},
         '1_3': {'all': 62300, '-1k': 1000, '-2.5k': 2500, '-5k': 5000, '-10k':10000}
     }
@@ -90,51 +92,58 @@ def get_config(config_name):
 
 
 def run(settings):
-    roi = settings.roi # 'vc'
-    fs = settings.fs #1000
-    dura = settings.duration # 200
-    device = settings.device
+    fig, axes = plt.subplots(nrows=2, figsize=(8, 12))
+    for roi in settings.roi: # 'vc'
+        fs = settings.fs #1000
+        dura = settings.duration # 200
+        device = settings.device
 
-    result_save_dir = os.path.join(settings.result_root, 'vis_scalings')
-    result_save_dir = os.path.join(settings.result_root, 'vis_scalings')
-    csvpath = os.path.join(result_save_dir, '{roi}-{fs}-{dura}-{sbj_list}.csv'.format(roi=roi, fs=fs, dura=dura, sbj_list='_'.join(settings.eval_sbj)))
-    df = pd.read_csv(csvpath)
-    df = df.fillna('all')
-    fig, axes = plt.subplots(nrows=2, ncols=len(settings.eval_sbj), figsize=(24, 12))
-    for i, e_sub in enumerate(settings.eval_sbj):
-        e_sub_df = df.query('eval_sbj=={}'.format(e_sub))
-        for t_sub in settings.trained_sbj:
-            t_sub_df = e_sub_df.query('trained_sbj=="{}"'.format(t_sub))
-            # print(t_sub, settings.n_samples_replace_dict[t_sub])
-            # import pdb; pdb.set_trace()
-            t_sub_df = t_sub_df.replace({'n_sample': settings.n_samples_replace_dict[t_sub]})
-            t_sub_df = t_sub_df.sort_values(by='n_sample', axis=0)
-            # best
-            best_df = t_sub_df.query('model_name=="best"')
-            x = best_df['n_sample'].to_list()
-            loss = best_df['val_loss'].to_list()
-            corr = best_df['val_corr'].to_list()
-            axes[0, i].plot(x, loss, '-o', label=f'{t_sub}-best')
-            axes[1, i].plot(x, corr, '-o', label=f'{t_sub}-best')
-            # import pdb; pdb.set_trace()
-            # last
-            # last_df = t_sub_df.query('model_name=="last"')
-            # x = last_df['n_sample'].to_list()
-            # loss = last_df['val_loss'].to_list()
-            # corr = last_df['val_corr'].to_list()
-            # axes[0, i].plot(x, loss, label=f'{t_sub}-last')
-            # axes[1, i].plot(x, corr, label=f'{t_sub}-last')
-        axes[0,i].legend()
-        axes[1,i].legend()
-        axes[0,i].set_ylabel('test loss (sbj: {})'.format(e_sub))
-        axes[1,i].set_ylabel('test corr (sbj: {})'.format(e_sub))
-        axes[0,i].set_xlabel('num samples (log)')
-        axes[1,i].set_xlabel('num samples (log)')
+        result_save_dir = os.path.join(settings.result_root, 'vis_scalings')
+        result_save_dir = os.path.join(settings.result_root, 'vis_scalings')
+        try:
+            csvpath = os.path.join(result_save_dir, '{roi}-{fs}-{dura}-{sbj_list}.csv'.format(roi=roi, fs=fs, dura=dura, sbj_list='_'.join(settings.eval_sbj)))
+            df = pd.read_csv(csvpath)
+        except FileNotFoundError:
+            csvpath = os.path.join(result_save_dir, '{roi}-{fs}-{dura}-{sbj_list}.csv'.format(roi=roi, fs=fs, dura=dura, sbj_list='_'.join(['1','2','3'])))
+            df = pd.read_csv(csvpath)
+        df = df.fillna('all')
+        for i, e_sub in enumerate(settings.eval_sbj):
+            e_sub_df = df.query('eval_sbj=={}'.format(e_sub))
+            for t_sub in settings.trained_sbj:
+                t_sub_df = e_sub_df.query('trained_sbj=="{}"'.format(t_sub))
+                if len(t_sub_df)==0:
+                    t_sub_df = e_sub_df.query('trained_sbj=={}'.format(t_sub))
+                # print(t_sub, settings.n_samples_replace_dict[t_sub])
+                # import pdb; pdb.set_trace()
+                t_sub_df = t_sub_df.replace({'n_sample': settings.n_samples_replace_dict[t_sub][roi]})
+                t_sub_df = t_sub_df.sort_values(by='n_sample', axis=0)
+                # best
+                best_df = t_sub_df.query('model_name=="best"')
+                x = best_df['n_sample'].to_list()
+                loss = best_df['val_loss'].to_list()
+                corr = best_df['val_corr'].to_list()
+                # import pdb; pdb.set_trace()
+                axes[0].plot(x, loss, '-o', label=f'{roi}-best')
+                axes[1].plot(x, corr, '-o', label=f'{roi}-best')
+                # import pdb; pdb.set_trace()
+                # last
+                # last_df = t_sub_df.query('model_name=="last"')
+                # x = last_df['n_sample'].to_list()
+                # loss = last_df['val_loss'].to_list()
+                # corr = last_df['val_corr'].to_list()
+                # axes[0].plot(x, loss, label=f'{t_sub}-last')
+                # axes[1].plot(x, corr, label=f'{t_sub}-last')
+    axes[0].legend()
+    axes[1].legend()
+    axes[0].set_ylabel('test loss (sbj: {})'.format(e_sub))
+    axes[1].set_ylabel('test corr (sbj: {})'.format(e_sub))
+    axes[0].set_xlabel('num samples (log)')
+    axes[1].set_xlabel('num samples (log)')
 
-        axes[0,i].set_xscale('log')
-        axes[1,i].set_xscale('log')
+    axes[0].set_xscale('log')
+    axes[1].set_xscale('log')
 
-    pngpath = os.path.join(csvpath.replace('.csv', 'best.png'))
+    pngpath = os.path.join(csvpath.replace('.csv', 'roi_best.png'))
     plt.savefig(pngpath,bbox_inches="tight")
     print('save image as ', pngpath)
 

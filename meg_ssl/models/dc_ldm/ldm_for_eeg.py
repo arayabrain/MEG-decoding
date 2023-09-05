@@ -108,7 +108,7 @@ class eLDM:
 
         model = instantiate_from_config(config.model)
         pl_sd = torch.load(self.ckp_path, map_location="cpu")['state_dict']
-
+        print('generative model original weight is from: ', self.ckp_path)
         m, u = model.load_state_dict(pl_sd, strict=False)
         model.cond_stage_trainable = True
         model.cond_stage_model = cond_stage_model(metafile, num_voxels, self.cond_dim, global_pool=global_pool, clip_tune = clip_tune,cls_tune = cls_tune)

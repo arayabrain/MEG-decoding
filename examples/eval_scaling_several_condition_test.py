@@ -13,13 +13,14 @@ from meg_ssl.models import get_model_and_trainer
 
 
 class EvalSettings:
-    trained_sbj = ['1', '3', '1_3']
-    eval_sbj = ['1', '2', '3']
+    trained_sbj = ['1'] # ['1', '3', '1_3']
+    eval_sbj = ['1'] # ['1', '2', '3']
     num_samples = ['', '-10k', '-5k', '-2.5k', '-1k'] # roi等の情報も含める場合がある
+    num_samples = ['_frontal' + s for s in num_samples]
     device = 'cuda'
     fs = 1000
     duration = 200
-    roi = 'vc'
+    roi = 'frontal '# 'vc'
     # fss = [1000]
     # durations = [200]
     model_names = ['best', 'last'] # 'last'
@@ -152,34 +153,34 @@ def run(settings):
         print('Eval Sbj: ', e_sub)
         print('deterministic: ', train_dataset.datasets[0].deterministic)
         train_dataset.datasets[0].deterministic = True
-        import pdb; pdb.set_trace()
-    #     # import pdb; pdb.set_trace()
-    #     val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=1)
-    #     for t_sub in settings.trained_sbj:
-    #         for n_sample in settings.num_samples:
-    #             for model_name in settings.model_names:
-    #                 #  'sbj{sbj_name}/scmbm_{patch_size}-fs{fs}-dura{duration}/ckpt/{model_name}{n_sample}.pth'
-    #                 ckpt_filename = settings.ckpt_pattern.format(sbj_name=t_sub, patch_size=4, fs=fs, duration=dura, model_name=model_name, n_sample=n_sample)
-    #                 ckpt_path = os.path.join(settings.result_root, ckpt_filename)
-    #                 print('load weight from ', ckpt_path)
-    #                 model.load_state_dict(torch.load(ckpt_path))
-    #                 ret = eval_one_condition(val_dataloader, model, trainer, device)
+        # import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
+        val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=1)
+        for t_sub in settings.trained_sbj:
+            for n_sample in settings.num_samples:
+                for model_name in settings.model_names:
+                    #  'sbj{sbj_name}/scmbm_{patch_size}-fs{fs}-dura{duration}/ckpt/{model_name}{n_sample}.pth'
+                    ckpt_filename = settings.ckpt_pattern.format(sbj_name=t_sub, patch_size=4, fs=fs, duration=dura, model_name=model_name, n_sample=n_sample)
+                    ckpt_path = os.path.join(settings.result_root, ckpt_filename)
+                    print('load weight from ', ckpt_path)
+                    model.load_state_dict(torch.load(ckpt_path))
+                    ret = eval_one_condition(val_dataloader, model, trainer, device)
 
-    #                 df['eval_sbj'].append(e_sub)
-    #                 df['trained_sbj'].append(t_sub)
-    #                 df['model_name'].append(model_name)
-    #                 df['n_sample'].append(n_sample)
-    #                 for key, value in ret.items():
-    #                     df[key].append(value)
+                    df['eval_sbj'].append(e_sub)
+                    df['trained_sbj'].append(t_sub)
+                    df['model_name'].append(model_name)
+                    df['n_sample'].append(n_sample)
+                    for key, value in ret.items():
+                        df[key].append(value)
 
 
-    # result_save_dir = os.path.join(settings.result_root, 'vis_scalings')
-    # os.makedirs(result_save_dir, exist_ok=True)
-    # savepath = os.path.join(result_save_dir, '{roi}-{fs}-{dura}-{sbj_list}.csv'.format(roi=roi, fs=fs, dura=dura, sbj_list='_'.join(settings.eval_sbj)))
+    result_save_dir = os.path.join(settings.result_root, 'vis_scalings')
+    os.makedirs(result_save_dir, exist_ok=True)
+    savepath = os.path.join(result_save_dir, '{roi}-{fs}-{dura}-{sbj_list}.csv'.format(roi=roi, fs=fs, dura=dura, sbj_list='_'.join(settings.eval_sbj)))
 
-    # df = pd.DataFrame(df)
-    # df.to_csv(savepath)
-    # print('DataFrame is saved to ', savepath)
+    df = pd.DataFrame(df)
+    df.to_csv(savepath)
+    print('DataFrame is saved to ', savepath)
 
 
 if __name__ == '__main__':

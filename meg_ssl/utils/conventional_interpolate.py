@@ -50,13 +50,16 @@ def polynomial_interpolate(data:np.ndarray, mask:np.ndarray, patch_size, order=3
 
 def scipy_interpolate(data:np.ndarray, mask:np.ndarray, patch_size, methods):
     method_name, method = methods
-    print(method_name)
+    # print(method_name)
     pred_data  = data.copy()
     unpatched_mask_batch = []
     for n in range(len(data)):
         unpatched_mask = np.zeros((len(mask[n])*patch_size))
         for i, s in enumerate(np.arange(0, len(mask[n])*patch_size, patch_size)):
             unpatched_mask[s:s+patch_size] = mask[n,i]
+        # scipyの一部の関数は予測する定義域が教師データの範囲内でないといけない
+        unpatched_mask[0] = 0
+        unpatched_mask[-1] = 0
         unpatched_mask_batch.append(unpatched_mask)
         for c in range(data.shape[1]):
             masked_x = np.where(unpatched_mask==1)[0]

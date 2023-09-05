@@ -172,13 +172,40 @@ def get_dataset(cfg):
     ])
     return DiffusionDataset(dataset_dict['train'], img_transform_train), DiffusionDataset(dataset_dict['val'], img_transform_test)
 
-def image_reconstruction(model, dataset:torch.utils.data.Dataset, state, num_samples:int, savedir:str):
+def image_reconstruction(model, dataset:torch.utils.data.Dataset, state, num_samples:int, 
+                         savedir:str, device:str='cuda'):
+    model.to(device)
     for i, batch in enumerate(dataset):
-        grid, array, state = model.generate(batch, num_samples, ddim_steps=50, HW=None, limit=5, state=state)
+        dict_batch = {
+            'eeg': [batch['eeg'].to(device)],
+            'image': [batch['image'].to(device)]
+        }
+        grid, array, state = model.generate(dict_batch, 
+                                            num_samples, 
+                                            ddim_steps=50, 
+                                            HW=None, 
+                                            limit=5, 
+                                            state=state)
+        
         savefile_path = os.path.join(savedir, f'{i}.png')
-        image = Image.fromarray(array)
+        # print(grid.shape, grid.max(), grid.min())
+        grid = grid.astype(np.uint8)
+        image = Image.fromarray(grid)
         image.save(savefile_path)
-        break
+        print('grid is saved as ', savefile_path)
+        array = array.squeeze().squeeze()
+        print(array.shape, array.max(), array.min())
+        if array.ndim == 4:
+            array = np.transpose(array, (0, 2,3,1))
+        else:
+            array = np.transpose(array[0], (0, 2,3,1))
+        # for j, img in enumerate(array):
+        #     image = Image.fromarray(img)
+        #     img_name = str(j-1) if j > 0 else 'gt'
+        #     image.save(os.path.join(savedir, f'{i}-{img_name}.png'))
+        
+        # break
+        
 
 
 def main(config, args):
@@ -206,6 +233,26 @@ def main(config, args):
     generative_model.learning_rate = config.training.lr
     generative_model.eval_avg = config.training.eval_avg
 
+    
+    # load model weight
+    weightpath = os.path.join(f'../../results_task/dream_diffusion/{args.meg_exp}-{args.ldf_exp}/ckpt/current-generator.pth')
+    model_info = torch.load(weightpath, map_location='cpu')
+    print('pretrained model is loaded from ', weightpath)
+    before_weight = copy.deepcopy(generative_model.cpu().state_dict())
+    print('generative_model last layer summation: ', generative_model.state_dict()['image_embedder.transformer.visual_projection.weight'].sum(), get_total_mean(generative_model.state_dict()))
+    if 'model_state_dict' in model_info.keys():
+        generative_model.load_state_dict(model_info['model_state_dict'])
+        state = model_info['state']
+    else:
+        generative_model.init_from_ckpt(weightpath) # (model_info)
+        state = None
+    print('generative_model last layer summation: ', generative_model.state_dict()['image_embedder.transformer.visual_projection.weight'].sum(), get_total_mean(generative_model.state_dict()))
+    compare_weight(before_weight, generative_model.cpu().state_dict())
+    # print('=============== before vs model_info==========')
+    # compare_weight(before_weight, model_info)
+    # import pdb; pdb.set_trace()
+    # exit()
+
     # trainable settings
     generative_model.unfreeze_whole_model()
     generative_model.freeze_first_stage()
@@ -213,26 +260,34 @@ def main(config, args):
     # generative_model.unfreeze_cond_stage()
     generative_model.train_cond_stage_only = False # True
     
-    # load model weight
-    weightpath = os.path.join(f'../../results_task/dream_diffusion/{args.meg_exp}-{args.ldf_exp}/ckpt/best-meg_enc.pth')
-    model_info = torch.load(weightpath)
-    print('pretrained model is loaded from ', weightpath)
-    generative_model.load_state_dict(model_info['model_state_dict'])
-    state = model_info['state']
     # generate
     savedir = os.path.join(f'../../results_task/dream_diffusion/{args.meg_exp}-{args.ldf_exp}/reconst/eval')
     os.makedirs(savedir, exist_ok=True)
     num_samples = 3
 
-    image_reconstruction(generative_model, val_dataset, state, num_samples, savedir)
+    image_reconstruction(generative_model, train_dataset, state, num_samples, savedir)
     print('end')
+
+def get_total_mean(state):
+    total_mean = 0
+    for k, s in state.items():
+        total_mean += s.sum().item()
+    return total_mean
+
+def compare_weight(state1, state2):
+    for k in list(state1.keys()):
+        s1 = state1[k]
+        s2 = state2[k]
+        if  not (s1==s2).cpu().numpy().all():
+            continue
+        print(k, (s1==s2).cpu().numpy().all())# , s1.sum(), s2.sum())
      
 
 
 if __name__ == '__main__':
     args = get_args_parser()
 
-    set_seed(42)
+    set_seed(40)
     with initialize(config_path='meg_ssl/generate_configs/'):
         meg_cfg = compose(args.meg_config)
     if args.meg_encoder is not None:

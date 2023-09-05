@@ -16,6 +16,7 @@ from hydra import compose, initialize
 import torch.nn.functional as F
 from meg_decoding.utils.loss import CLIPLoss
 from PIL import Image
+import copy
 import wandb
 
 def cosin_sim(target_emb, image_embeds):
@@ -145,9 +146,23 @@ class DiffusionTrainer(BaseSSLTrainer):
             self.generator.cond_stage_model.eval()
 
         loss_logs = {}
+        
         with tqdm.tqdm(self.train_loader) as pbar:
             for step, batch in enumerate(pbar):
+                # DEBUG START
+                # befora_state = copy.deepcopy(self.generator.state_dict())
+                # DEBUG END
                 total_loss, loss_dict, c = self.train_one_step(epoch, step, batch)
+                # DEBUG START
+                # after_state = self.generator.state_dict()
+                # self.compare_weight(before_state,after_state, target_flag=False)
+                # self.compare_weight(before_state, after_state, target_flag=True)
+                # module_list = self.get_largest_module_names(before_state)
+                # self.compare_weight(before_state, after_state, target_flag=True, module_names=module_list)
+                # self.get_grad(self.generator, module_names=module_list)
+                # self.get_weight_sum_avg(after_state, module_name='model')
+                # import pdb; pdb.set_trace()
+                # DEBUG END
                 pbar.set_description("[Epoch {}] step={},loss={}".format(
                     epoch, step, total_loss))
                 loss_dict.update({'train/total_loss': total_loss})
@@ -170,20 +185,96 @@ class DiffusionTrainer(BaseSSLTrainer):
         c = c.to(self.device)
         label = label.to(self.device)
         image_raw = image_raw.to(self.device)
+        
         if self.generator.return_cond:
             loss, cc = self.generator(x, c, label, image_raw)
-            total_loss = loss[0]
+            total_loss = loss[0] # * 1e5 # DEBUG
             loss_dict = loss[1]
             total_loss.backward()
             self.optimizer.step()
             return total_loss.item(), {k:v.item() for k, v in loss_dict.items()}, cc
         else:
             loss = self.generator(x, c, label, image_raw)
-            total_loss = loss[0]
+            total_loss = loss[0] # * 1e5 # DEBUG
             loss_dict = loss[1]
             total_loss.backward()
             self.optimizer.step()
             return total_loss.item(), {k:v.item() for k, v in loss_dict.items()}, None
+    
+    @staticmethod
+    def compare_weight(state1, state2, target_flag=True, module_names:list=None):
+        print(f'======================================= TARGET FLAG = {target_flag}=====================================================')
+        if module_names is not None:
+            flag_per_module = {k : [] for k in module_names}
+        for key in state1.keys():
+            val1 = state1[key]
+            val2 = state2[key]
+            flag = (val1==val2).cpu().numpy().all()
+            if module_names is not None:
+                module_name = key.split('.')[0]
+                flag_per_module[module_name].append(flag)
+            else:
+                if flag == target_flag:
+                    print(key, '::\t', flag)
+
+        print('=============weight update judge for MODULE=============')
+        if module_names is not None:
+            for key, value in flag_per_module.items():
+                print(key, np.all(value))
+
+    @staticmethod
+    def get_weight_sum_avg(state, module_name='all'):
+        sum_list = []
+        for key, value in state.items():
+            if module_name == 'all':
+                pass
+            elif module_name in key:
+                pass
+            else:
+                continue
+            sum_list.append(value.sum().item())
+
+        avg_sum = np.mean(sum_list)
+        print('=============average of weight sum=============')
+        print(module_name, avg_sum)
+        return avg_sum
+
+    @staticmethod
+    def get_grad(model, module_names:list=None):
+        if module_names is not None:
+            grad_per_module = {k : [] for k in module_names}
+            require_grad_per_module = {k : [] for k in module_names}
+            
+
+        for name, parameter in model.named_parameters():
+            grads = parameter.grad
+            grad_sum = grads.sum().item() if grads is not None else 0
+            if module_names is not None:
+                module_name = name.split('.')[0]
+                grad_per_module[module_name].append(grad_sum)
+                require_grad_per_module[module_name].append(parameter.requires_grad)
+            else:
+                print(name, grad_sum)
+
+        print('============grad and requires grad for MODULE================')
+        if module_names is not None:
+            for key, value in grad_per_module.items():
+                print(key, np.sum(value), np.all(require_grad_per_module[key]))
+            
+
+
+    @staticmethod
+    def get_largest_module_names(state):
+        largest_module_name_list = []
+        for key in state:
+            largest_module_name = key.split('.')[0]
+            if largest_module_name in largest_module_name_list:
+                continue
+            else:
+                largest_module_name_list.append(largest_module_name)
+        print(largest_module_name_list)
+        return largest_module_name_list
+    
 
     def validation(self, epoch:int)->dict:
         self.generator.eval()
