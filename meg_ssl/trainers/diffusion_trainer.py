@@ -18,6 +18,7 @@ from meg_decoding.utils.loss import CLIPLoss
 from PIL import Image
 import copy
 import wandb
+import peft
 
 def cosin_sim(target_emb, image_embeds):
     loss = 1 - torch.cosine_similarity(target_emb, image_embeds, dim=-1).mean()
@@ -93,6 +94,10 @@ class DiffusionTrainer(BaseSSLTrainer):
                      train_dataset:Dataset, val_dataset:Dataset, collate_fn=None,
                      ):
         self.generator = generator.to(self.device).eval()
+        if isinstance(self.generator, peft.peft_model.PeftModel):
+            self.peft_flag = True
+        else:
+            self.peft_flag = False
         self.image_preprocessor = image_preprocessor if image_preprocessor is not None else []
         assert isinstance(self.image_preprocessor, list)
 
@@ -104,26 +109,28 @@ class DiffusionTrainer(BaseSSLTrainer):
 
         assert self.config.trainable_cond_model or self.config.trainable_generator_model
 
-
-        if self.config.trainable_generator_model:
-            self.generator.train_cond_stage_only = False
-            self.generator.unfreeze_whole_model()
-            self.generator.freeze_first_stage()
-            print('generator is trainable but first stage model')
+        if self.peft_flag:
+            pass
         else:
-            self.generator.freeze_whole_model()
-            print('generator is frozen')
+            if self.config.trainable_generator_model:
+                self.generator.train_cond_stage_only = False
+                self.generator.unfreeze_whole_model()
+                self.generator.freeze_first_stage()
+                print('generator is trainable but first stage model')
+            else:
+                self.generator.freeze_whole_model()
+                print('generator is frozen')
 
-        if self.config.trainable_cond_model:
-            self.generator.cond_stage_trainable = True
-            self.generator.unfreeze_cond_stage()
-            print('meg encoder is trainable')
-        else:
-            self.generator.cond_stage_trainable = False
-            self.generator.freeze_cond_stage()
-            print('meg encoder is frozen')
+            if self.config.trainable_cond_model:
+                self.generator.cond_stage_trainable = True
+                self.generator.unfreeze_cond_stage()
+                print('meg encoder is trainable')
+            else:
+                self.generator.cond_stage_trainable = False
+                self.generator.freeze_cond_stage()
+                print('meg encoder is frozen')
 
-        
+
         os.makedirs(self.reconst_dir, exist_ok=True)
         self.other_setup()
 
@@ -146,7 +153,7 @@ class DiffusionTrainer(BaseSSLTrainer):
             self.generator.cond_stage_model.eval()
 
         loss_logs = {}
-        
+
         with tqdm.tqdm(self.train_loader) as pbar:
             for step, batch in enumerate(pbar):
                 # DEBUG START
@@ -185,7 +192,7 @@ class DiffusionTrainer(BaseSSLTrainer):
         c = c.to(self.device)
         label = label.to(self.device)
         image_raw = image_raw.to(self.device)
-        
+
         if self.generator.return_cond:
             loss, cc = self.generator(x, c, label, image_raw)
             total_loss = loss[0] # * 1e5 # DEBUG
@@ -200,7 +207,7 @@ class DiffusionTrainer(BaseSSLTrainer):
             total_loss.backward()
             self.optimizer.step()
             return total_loss.item(), {k:v.item() for k, v in loss_dict.items()}, None
-    
+
     @staticmethod
     def compare_weight(state1, state2, target_flag=True, module_names:list=None):
         print(f'======================================= TARGET FLAG = {target_flag}=====================================================')
@@ -244,7 +251,7 @@ class DiffusionTrainer(BaseSSLTrainer):
         if module_names is not None:
             grad_per_module = {k : [] for k in module_names}
             require_grad_per_module = {k : [] for k in module_names}
-            
+
 
         for name, parameter in model.named_parameters():
             grads = parameter.grad
@@ -260,7 +267,7 @@ class DiffusionTrainer(BaseSSLTrainer):
         if module_names is not None:
             for key, value in grad_per_module.items():
                 print(key, np.sum(value), np.all(require_grad_per_module[key]))
-            
+
 
 
     @staticmethod
@@ -274,7 +281,7 @@ class DiffusionTrainer(BaseSSLTrainer):
                 largest_module_name_list.append(largest_module_name)
         print(largest_module_name_list)
         return largest_module_name_list
-    
+
 
     def validation(self, epoch:int)->dict:
         self.generator.eval()
@@ -305,9 +312,9 @@ class DiffusionTrainer(BaseSSLTrainer):
     @torch.no_grad()
     def val_one_step(self, step, batch, limit=5)->float:
         # generate
-        grid, all_samples, state = self.generator.generate(batch, 
-                                                           ddim_steps=self.generator.ddim_steps, 
-                                                           num_samples=1, 
+        grid, all_samples, state = self.generator.generate(batch,
+                                                           ddim_steps=self.generator.ddim_steps,
+                                                           num_samples=1,
                                                            limit=limit)
         #
         metric, metric_list = self.generator.get_eval_metric(all_samples, avg=self.config.eval_avg)

@@ -187,7 +187,7 @@ def main(config, args):
     # create generateive model
     eldm = eLDM(pretrain_mbm_metafile, num_voxels,
                 device=device, pretrain_root=config.pretrain_gm_path, logger=None,
-                ddim_steps=config.training.ddim_steps, global_pool=config.training.global_pool, 
+                ddim_steps=config.training.ddim_steps, global_pool=config.training.global_pool,
                 use_time_cond=config.training.use_time_cond,
                 clip_tune = config.training.clip_tune, cls_tune = config.training.cls_tune)
     generative_model = eldm.model

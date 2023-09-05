@@ -24,7 +24,7 @@ class SessionDatasetGOD(Dataset):
     def __init__(self, dataset_config:OmegaConf, preproc_config:OmegaConf, meg_path:str, image_root:str,
                  meg_trigger_path:str, meg_label_path:str, h5_file_name:str, image_id_path:str, sbj_name:str=None,
                  image_preprocs:str=[], meg_preprocs:list=[], num_trial_limit:int=1200,
-                 only_meg:bool=False, on_memory:bool=False):
+                 only_meg:bool=False, on_memory:bool=False, ret_image_label:bool=False):
         """
         dataset_config: has attribute {meg_fs, kernel_root, roi_block_ids, ch_region_path, region}
         preproc_config: has attribute {meg_onset, meg_duration, clamp, bandpass_filter, brain_resample_rate, src_reconstruction, baseline_duration}
@@ -41,6 +41,7 @@ class SessionDatasetGOD(Dataset):
         self.meg_preprocs = meg_preprocs # list
         self.only_meg = only_meg # bool
         self.on_memory = on_memory # bool
+        self.ret_image_label = ret_image_label # bool
         self.meg_onset:float = preproc_config.meg_onset # [s]
         self.meg_durarion:float = preproc_config.meg_duration # [s]
         self.h5_file_name = h5_file_name
@@ -86,13 +87,17 @@ class SessionDatasetGOD(Dataset):
         if self.only_meg:
             return ROI_MEG_Data # , movie_frame # movie_frame is dummy
         else:
-            image_path = os.path.join(self.image_root, self.image_names[idx])
+            image_idx = self.meg_labels[idx]-1  # idxはあくまでもセッションにおける順番
+            image_path = os.path.join(self.image_root, self.image_names[image_idx])
             image = cv2.imread(image_path)
             cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             for func_ in self.image_preprocs:
                 image = func_(image)
                 # default: image channel is placed at last dimension
-            return ROI_MEG_Data, image
+            if self.ret_image_label:
+                return ROI_MEG_Data, image, image_idx
+            else:
+                return ROI_MEG_Data, image
 
 
 
@@ -133,7 +138,7 @@ class SessionDatasetGOD(Dataset):
             if (self.preproc_config.brain_resample_rate is not None) or (self.preproc_config.brain_resample_rate<self.meg_fs):
                 ROI_MEG_Data = mne.filter.resample(ROI_MEG_Data, down=self.meg_fs / self.preproc_config.brain_resample_rate)
                 print('resample {} to {} Hz'.format(self.meg_fs, self.preproc_config.brain_resample_rate))
-        
+
         assert ROI_MEG_Data.shape[0] == len(roi_channels), 'ROI_MEG_Data.shape[0] = {}, len(roi_channels) = {}'.format(ROI_MEG_Data.shape[0], len(roi_channels))
         assert ROI_MEG_Data.ndim == 2, 'ROI_MEG_Data.ndim = {}'.format(ROI_MEG_Data.ndim)
 
@@ -164,7 +169,7 @@ class SessionDatasetGOD(Dataset):
     @staticmethod
     def get_meg_label(label_path:str)->np.ndarray:
         data = scipy.io.loadmat(label_path)
-        return data['vec_index'][0]
+        return data['vec_index'][0] # 1始まり
 
     @staticmethod
     def get_meg_trigger(meg_trigger_path:str, decimation_rate:float, fs:float)->np.ndarray:

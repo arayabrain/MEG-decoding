@@ -1,0 +1,29 @@
+# ========model========
+meg_encoder:  scmbm
+prob_model: linear
+# ========prerpocessing========
+preprocess: fs1000_dura200
+
+# ========dataset========
+dataset_name:
+    train:
+        GOD: sbj_1-train-session_1_2_3_4_5_7_8_9_10_11
+    val:
+        GOD: sbj_1-train-session_6_12
+dataset_yaml:
+    # drama: drama/drama_vc.yaml # drama_config.yaml # region 160 ch
+    GOD: GOD/god_vc.yaml # god_config.yaml
+total_limit:
+    train:
+        GOD: 6000
+        # drama: 6000 # total number of samples across sessions about: 31200
+    val:
+        GOD: 1200 # total number of samples across sessions
+
+# ========path========
+h5_root: ../../../dataset/ssl_dataset/sbj1/{h5_name}
+resume_path: null
+meg_encoder_path: '../../results_ssl/sbj1/scmbm_4-fs1000-dura200/ckpt/best.pth' #
+image_encoder_path: null # null is allowed
+pretrain_gm_path: ../dreamdiffusion/pretrains
+save_path: ../../results_task/linear_prob/sbj1
