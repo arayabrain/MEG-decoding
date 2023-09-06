@@ -210,6 +210,7 @@ def image_reconstruction(model, dataset:torch.utils.data.Dataset, state, num_sam
 
 def main(config, args):
     train_dataset, val_dataset = get_dataset(config)
+    # import pdb; pdb.set_trace()
     num_voxels = int(meg_cfg.preprocess.meg_duration * meg_cfg.preprocess.brain_resample_rate) # eeg_latents_dataset_train.datasets[0].num_electrodes
     meg_encoder_pretrained_path = os.path.join(meg_cfg.meg_encoder_path.format(sbj_name=args.datadir, exp_name=args.meg_exp))
     meg_cfg.meg_encoder.parameters.in_chans = val_dataset.datasets[0].num_electrodes

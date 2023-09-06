@@ -4,7 +4,7 @@ from torch.utils.data import Sampler, Dataset
 import numpy as np
 import mne
 import h5py
-
+import torch.distributed as dist
 import scipy.io
 mne.set_log_level(verbose="WARNING")
 from omegaconf import OmegaConf
@@ -114,7 +114,9 @@ class SessionDatasetDrama(Dataset):
         if self.only_meg:
             return ROI_MEG_Data # , movie_frame # movie_frame is dummy
         else:
-            image = self.vc.get_frame(movie_frame)
+            print('load image', dist.get_rank())
+            image = self.vc.get_image_at(movie_frame) # get_frame(movie_frame)
+            print('load image end')
             cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             image = image[self.movie_crop_pt1[0]:self.movie_crop_pt2[0], self.movie_crop_pt1[1]:self.movie_crop_pt2[1], :] # crop
             for func_ in self.image_preprocs:

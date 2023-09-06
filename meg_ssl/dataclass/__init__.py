@@ -15,7 +15,7 @@ BLACK_MAT_FILE_LIST = ['sbj01/ID08_DreamGirlsVol1_1_id8_MEG_DATAPixx_part4.mat',
 
 def parse_dataset(dataset_names:dict, dataset_yamls:dict, preproc_config:OmegaConf,
                   num_trial_limits_dict:dict, h5_root:str, image_preprocs:list=[], meg_preprocs:list=[],
-                  only_meg:bool=False, on_memory:bool=False)->dict:
+                  only_meg:bool=False, on_memory:bool=False, ret_image_label:bool=False)->dict:
     """_summary_
 
     Args:
@@ -45,21 +45,20 @@ def parse_dataset(dataset_names:dict, dataset_yamls:dict, preproc_config:OmegaCo
                     raise ValueError('name {} is not supported'.format(name))
                 
 
-                # import pdb; pdb.set_trace()
                 dataset_info_list += tmp_dataset_info_list
                 dataset_config_list += [cfg] * len(dataset_info_list)
                 num_trial_limits += [int(num_trial_limits_dict[split][name]/len(dataset_info_list))] * len(dataset_info_list)
 
             split_datasets[split] = collect_session_dataset(dataset_info_list, dataset_config_list, preproc_config,
-                        num_trial_limits, image_preprocs, meg_preprocs, only_meg, on_memory)
+                        num_trial_limits, image_preprocs, meg_preprocs, only_meg, on_memory, ret_image_label)
     return split_datasets
 
 
 def collect_session_dataset(dataset_info_list:List[Dict], dataset_config_list:List[OmegaConf], preproc_config:OmegaConf,
-                    num_trial_limits:list, image_preprocs:list=[], meg_preprocs:list=[], only_meg:bool=False, on_memory:bool=False):
+                    num_trial_limits:list, image_preprocs:list=[], meg_preprocs:list=[], only_meg:bool=False, on_memory:bool=False, ret_image_label:bool=False):
     dataset_list = []
     for dataset_info, dataset_config, num_trial_limit in zip(dataset_info_list, dataset_config_list, num_trial_limits):
-        dataset = get_session_dataset(dataset_info, dataset_config, preproc_config, num_trial_limit, image_preprocs, meg_preprocs, only_meg, on_memory)
+        dataset = get_session_dataset(dataset_info, dataset_config, preproc_config, num_trial_limit, image_preprocs, meg_preprocs, only_meg, on_memory, ret_image_label)
         skip_flag = 0
         for black in BLACK_MAT_FILE_LIST:
             if black in dataset.meg_path:
@@ -76,7 +75,7 @@ def collect_session_dataset(dataset_info_list:List[Dict], dataset_config_list:Li
 
 def get_session_dataset(dataset_info:dict, dataset_config:OmegaConf, preproc_config:OmegaConf,
                         num_trial_limit, image_preprocs, meg_preprocs,
-                        only_meg, on_memory)->Union[SessionDatasetDrama, SessionDatasetGOD]:
+                        only_meg, on_memory, ret_image_label)->Union[SessionDatasetDrama, SessionDatasetGOD]:
     if dataset_config.name == 'drama':
         return SessionDatasetDrama(dataset_config, preproc_config, dataset_info['meg_path'], dataset_info['movie_path'],
                                    dataset_info['movie_trigger_path'], dataset_info['meg_trigger_path'], dataset_info['h5_file_name'],
@@ -87,6 +86,6 @@ def get_session_dataset(dataset_info:dict, dataset_config:OmegaConf, preproc_con
         return SessionDatasetGOD(dataset_config, preproc_config, dataset_info['meg_path'], dataset_info['image_root'],
                                  dataset_info['meg_trigger_path'], dataset_info['meg_label_path'], dataset_info['h5_file_name'],
                                  dataset_info['image_id_path'], sbj_name=dataset_info['sbj_name'], image_preprocs=image_preprocs, meg_preprocs=meg_preprocs,
-                                 num_trial_limit=num_trial_limit, only_meg=only_meg, on_memory=on_memory)
+                                 num_trial_limit=num_trial_limit, only_meg=only_meg, on_memory=on_memory, ret_image_label=ret_image_label)
     else:
         raise ValueError('dataset_config.name {} is not supported'.format(dataset_config.name))

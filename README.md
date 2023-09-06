@@ -172,6 +172,9 @@ cossim-global pool lora
 
 `python contrastive_learning.py --config sbj1_6k_cos_sim --meg_model scmbm_16 --vision_model vit_clip16 --decode_model mlp --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_16-fs1000-dura200 --h5name vc-fs1000-dura200-3 --wandbkey /home/yainoue/wandb_inoue.txt`
 
+# 0906 Downstream
+`python contrastive_learning.py --config sbj1_god_drama_clip --meg_model scmbm --vision_model vit_clip16 --decode_model mlp --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200 --h5name vc-fs1000-dura200-1 --wandbkey /home/yainoue/wandb_inoue.txt`
+
 
 ## Diffusion
 `python eeg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config config_generative_model --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200 --meg_h5name vc-fs1000-dura200-1`

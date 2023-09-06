@@ -18,10 +18,11 @@ class VideoController(object):
             ValueError: if file cannot be opened.
         """
         self.movie_path = movie_path
+        # import pdb; pdb.set_trace()
         if self.movie_path != 0 and not os.path.exists(movie_path):
             print('while loading {}, following eception occurs.'.format(self.movie_path))
             raise FileNotFoundError("camera or video cannot be not opened.")
-
+        # 複数processが同じ動画ファイルにアクセスするとデッドロックになる
         self.video_capture = cv2.VideoCapture(movie_path)
 
         if not self.video_capture.isOpened():

@@ -7,7 +7,7 @@ def get_model_and_trainer(config, device_count=1, usewandb=True, only_model:bool
     else:
         # model_name = config.meg_encoder.name
         model_config = config.meg_encoder
-    training_config = config.training
+    training_config = config.training if not only_model else None
     model_name = model_config.name
     if model_name == 'sc_mbm':
         model = MAEforEEG(**model_config.parameters)
