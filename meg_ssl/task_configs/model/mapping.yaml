@@ -1,0 +1,6 @@
+name: mapping
+parameters:
+  input_features: null # depends on meg encoder
+  middle_features: null  # depends on time length
+  output_features: 512 # depends on image encoder
+  activation: relu

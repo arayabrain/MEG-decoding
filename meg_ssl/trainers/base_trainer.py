@@ -90,7 +90,8 @@ class BaseSSLTrainer():
                 lr = param_group['lr']
                 break
             train_metrics.update({'lr':lr})
-            print('lr: ', lr)
+            print('lr: ', lr, 'train metrics: ', train_metrics)
+            
             # logging
             self.pkl_logger.log(train_metrics, 'train')
             # validation

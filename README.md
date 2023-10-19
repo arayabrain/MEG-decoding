@@ -197,6 +197,18 @@ python meg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config co
 ## Diffusion3(debug)
 python meg_ldm.py --dataset MEG  --num_epoch 300 --batch_size 4  --meg_config config_generative_model_test_only_generator --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200-1k --meg_h5name vc-fs1000-dura200-2 --device_counts 1 --ldf_exp debug --datadir sbj1
 
+## Diffusin 4
+python meg_ldm.py --dataset MEG  --num_epoch 100 --batch_size 4  --meg_config config_generative_model_test --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200 --meg_h5name vc-fs1000-dura200-1 --device_counts 1 --ldf_exp test_gen_enc --datadir sbj1
+
+python meg_ldm_generate.py --dataset MEG  --num_epoch 100 --batch_size 4  --meg_config config_generative_model_test --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200 --meg_h5name vc-fs1000-dura200-1 --device_counts 1 --ldf_exp test_gen_enc --datadir sbj1
+
+nohup python meg_ldm.py --dataset MEG  --num_epoch 500 --batch_size 2  --meg_config config_generative_model_test --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200 --meg_h5name vc-fs1000-dura200-1 --device_counts 1 --ldf_exp test_enc-6k --datadir sbj1 > logs/0914_diffusion.out &
+
+nohup python meg_ldm.py --dataset MEG  --num_epoch 500 --batch_size 2  --meg_config config_generative_model_test --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200 --meg_h5name vc-fs1000-dura200-1 --device_counts 1 --ldf_exp test_enc-6k-resume --datadir sbj1 > logs/0914_diffusion.out &
+
+nohup python meg_ldm.py --dataset MEG  --num_epoch 500 --batch_size 2  --meg_config config_generative_model_test --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200-5k --meg_h5name vc-fs1000-dura200-2 --device_counts 1 --ldf_exp test_enc-6k-resume --datadir sbj1 > logs/0922_diffusion.out &
+
+nohup python meg_ldm.py --dataset MEG  --num_epoch 500 --batch_size 2  --meg_config config_generative_model_test --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200-1k --meg_h5name vc-fs1000-dura200-3 --device_counts 1 --ldf_exp test_enc-6k-resume --datadir sbj1 > logs/0922_diffusion1k.out &
 
 ### only generator
 #### MEG Encoder all
@@ -211,6 +223,9 @@ python meg_ldm.py --dataset MEG  --num_epoch 100 --batch_size 4  --meg_config co
 python meg_ldm_generate.py --dataset MEG  --meg_config config_generative_model_test_only_generator --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200-5k --meg_h5name vc-fs1000-dura200-2 --device_counts 1 --ldf_exp test_gen-5k 
 
 
+python meg_ldm_generate.py --dataset MEG  --meg_config config_generative_model_test --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200 --meg_h5name vc-fs1000-dura200-2 --device_counts 1 --ldf_exp test_gen_enc
+
+python meg_ldm_generate.py --dataset MEG --meg_config config_generative_model_test --meg_encoder scmbm --meg_preprocess fs1000_dura200 --meg_exp scmbm_4-fs1000-dura200 --meg_h5name vc-fs1000-dura200-1 --ldf_exp test_enc-6k
 
 ## ROI=ALL
 `train_ssl.py --config sbj1_all_all --model scmbm --preprocess fs1000_dura200 --device_counts 1 --exp scmbm_4-fs1000-dura200-roi_all --h5name fs1000-dura200-roi_all-1 --wandbkey /home/yainoue/wandb_inoue.txt`

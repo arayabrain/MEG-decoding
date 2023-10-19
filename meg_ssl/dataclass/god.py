@@ -74,6 +74,7 @@ class SessionDatasetGOD(Dataset):
         else:
             with h5py.File(self.h5_file_name, "r") as h5:
                 ROI_MEG_Data = h5['ROI_MEG_Data'][:,baseline_frame:end_frame]
+        # import pdb; pdb.set_trace()
          # z-score -> baseline correction -> clamp
         ROI_MEG_Data = z_score_epoch(ROI_MEG_Data) # z-score by channel across time
         ROI_MEG_Data -= np.mean(ROI_MEG_Data[:, :self.baseline_duration_frames], axis=1)[:, np.newaxis] # baseline correction
@@ -90,7 +91,7 @@ class SessionDatasetGOD(Dataset):
             image_idx = self.meg_labels[idx]-1  # idxはあくまでもセッションにおける順番
             image_path = os.path.join(self.image_root, self.image_names[image_idx])
             image = cv2.imread(image_path)
-            cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             for func_ in self.image_preprocs:
                 image = func_(image)
                 # default: image channel is placed at last dimension
@@ -158,6 +159,8 @@ class SessionDatasetGOD(Dataset):
         self.indices = np.arange(len(self.meg_triggers))[:self.num_image_limit]
 
         self.num_electrodes = ROI_MEG_Data.shape[0]
+        # if 'val' in self.meg_path:
+        #     import pdb; pdb.set_trace()
 
 
 

@@ -47,8 +47,9 @@ def parse_dataset(dataset_names:dict, dataset_yamls:dict, preproc_config:OmegaCo
 
                 dataset_info_list += tmp_dataset_info_list
                 dataset_config_list += [cfg] * len(dataset_info_list)
-                num_trial_limits += [int(num_trial_limits_dict[split][name]/len(dataset_info_list))] * len(dataset_info_list)
-
+                # FIX BUG: dataset_info_list -> tmp_dataset_info_list
+                num_trial_limits += [int(num_trial_limits_dict[split][name]/len(tmp_dataset_info_list))] * len(tmp_dataset_info_list)
+            # import pdb; pdb.set_trace()
             split_datasets[split] = collect_session_dataset(dataset_info_list, dataset_config_list, preproc_config,
                         num_trial_limits, image_preprocs, meg_preprocs, only_meg, on_memory, ret_image_label)
     return split_datasets
@@ -68,7 +69,6 @@ def collect_session_dataset(dataset_info_list:List[Dict], dataset_config_list:Li
             print('skipping the following dataset: ', dataset.meg_path)
             continue
         dataset_list.append(dataset)
-
     return ConcatDataset(dataset_list)
 
 

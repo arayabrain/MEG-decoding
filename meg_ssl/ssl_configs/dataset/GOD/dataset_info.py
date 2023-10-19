@@ -24,7 +24,12 @@ def get_dataset_info(name:str, h5_dir:str):
         start_id, end_id = session_ids.split('~')
         session_ids = list(range(int(start_id), int(end_id+1)))
     elif session_ids == 'all':
-        session_ids = list(range(1, 12+1)) # 1-12までがGODのsession
+        if split == 'train':
+            session_ids = list(range(1, 12+1)) # 1-12までがGODのtest session
+        elif split == 'val':
+            session_ids = list(range(1, 6+1)) # 1-6までがGODのval session
+        else:
+            raise ValueError('split only takes train or val')
     else:
         session_ids = session_ids.split('_')
     assert len(session_ids) > 0, 'session_ids must be list or range'
@@ -52,7 +57,7 @@ def dataset_path(sbj, split, id, h5_dir):
         session_name = 'data_val{}'.format(str(id).zfill(3))
         split_relate = 'test'
         trigger_name = 'val{}'.format(str(id).zfill(2))
-        label_name = f'ses_{id}'
+        label_name = f'val_{id}'
     else:
         raise ValueError('split must be train or val')
 

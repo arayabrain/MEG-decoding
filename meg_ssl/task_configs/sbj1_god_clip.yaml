@@ -8,47 +8,44 @@ preprocess: fs1000_dura200
 # ========dataset========
 dataset_name:
     train:
-        drama: sbj_1-session_all # all 1_3, 1~3
+        # drama: sbj_1-session_all # all 1_3, 1~3
         GOD: sbj_1-train-session_1_2_3_4_5_7_8_9_10_11
     val:
         GOD: sbj_1-train-session_6_12
 dataset_yaml:
-    drama: drama/drama_vc.yaml # region 160 ch
-    GOD: GOD/god_vc.yaml
+    # drama: drama/drama_vc.yaml # drama_config.yaml # region 160 ch
+    GOD: GOD/god_vc.yaml # god_config.yaml
 total_limit:
     train:
         GOD: 6000
-        drama: 6000 # total number of samples across sessions about: 31200
+        drama: 100000 # total number of samples across sessions about: 31200
     val:
         GOD: 1200 # total number of samples across sessions
 
 # ========path========
 h5_root: ../../../dataset/ssl_dataset/sbj1/{h5_name}
-# resume_path: null
-# meg_encoder_path: '../../results_ssl/sbj1/{exp_name}/ckpt/best.pth' #
-# image_encoder_path: null # null is allowed
-resume_path: '../../results_task/god_drama_clip/sbj1/scmbm_4-fs1000-dura200-roi_all/ckpt/decoder_last.pth' # null
-meg_encoder_path: '../../results_ssl/sbj1/{exp_name}/ckpt/best.pth' # '../../results_task/god_drama_clip/sbj1/scmbm_4-fs1000-dura200-6k/ckpt/meg_encoder_last.pth' # '../../results_ssl/sbj1/{exp_name}/ckpt/best.pth' #
+resume_path: '../../results_task/god_clip/sbj1/scmbm_4-fs1000-dura200-6k/ckpt/decoder_last.pth' # null
+meg_encoder_path: '../../results_task/god_clip/sbj1/scmbm_4-fs1000-dura200-6k/ckpt/meg_encoder_last.pth' # '../../results_ssl/sbj1/{exp_name}/ckpt/best.pth' #
 image_encoder_path: null # null is allowed
 
 # ========training========
 training:
     precision: 16
     val_check_interval: 10
-    num_workers: 16 # 16 # 4
+    num_workers: 8 #16 # 4
     batch_size: 50
-    lr: 1e-4 # 2.5e-4 # 0.01
+    lr: 2.5e-4 # 0.01
     min_lr: 1e-4 # 0 # 0.001
     weight_decay: 0.05
-    num_epoch: 300
-    warmup_epochs: 1 # 5
+    num_epoch: 100
+    warmup_epochs: 5
     # clip_grad: 0.8
     accum_iter: 1
-    mask_ratio: -1
+    # mask_ratio: 0.75
     global_pool: False
 
-    logdir: '../../results_task/god_drama_clip/sbj1/{exp_name}-6k/log'
-    ckpt_dir: '../../results_task/god_drama_clip/sbj1/{exp_name}-6k/ckpt'
+    logdir: '../../results_task/god_clip/sbj1/{exp_name}/log'
+    ckpt_dir: '../../results_task/god_clip/sbj1/{exp_name}/ckpt'
     # ========fine-tuning========
     meg_encoder_finetune: full # none
     image_encoder_finetune: none
@@ -58,5 +55,4 @@ training:
     clip:
         reduction: 'mean'
         init_temperature: 5.1 # 1 # 5.1
-        trainable: True
 

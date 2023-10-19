@@ -23,14 +23,24 @@ from transformers import AutoProcessor
 from meg_ssl.utils.image_preprocess import numpy2image
 from meg_ssl.trainers.diffusion_trainer import DiffusionTrainer
 # vit_processor = AutoProcessor.from_pretrained("openai/clip-vit-large-patch14")
-
+from torch.utils.data import ConcatDataset
 
 
 class DiffusionDataset():
-    def __init__(self, dataset, img_transform):
+    def __init__(self, dataset, img_transform, ret_image_label=True):
         self.dataset = dataset
         self.img_transform = img_transform
         self.vit_processor = AutoProcessor.from_pretrained("openai/clip-vit-large-patch14")
+
+        # DEBUG::
+        self.ret_image_label = ret_image_label
+        
+        if ret_image_label:
+            if isinstance(self.dataset, ConcatDataset):
+                for ds in self.dataset.datasets:
+                    if hasattr(ds, 'ret_image_label'):
+                        ds.ret_image_label=ret_image_label
+
 
     def __len__(self):
         return len(self.dataset)
@@ -41,14 +51,25 @@ class DiffusionDataset():
 
     def __getitem__(self, idx):
         ret = {}
-        eeg, image = self.dataset[idx]
+        if self.ret_image_label:
+            tuple_data = self.dataset[idx]
+            assert isinstance(tuple_data, tuple)
+            if len(tuple_data)==3:
+                eeg, image, label = tuple_data
+            else:
+                eeg, image = tuple_data
+                label = -1 # dummy
+        else:
+            eeg, image = self.dataset[idx]
+            label = -1 # dummy
         image_raw = numpy2image(image)
         image_raw = self.vit_processor(images=image_raw, return_tensors="pt")
         image_raw['pixel_values'] = image_raw['pixel_values'].squeeze(0)
         ret['image_raw'] = image_raw
         ret['image'] = self.img_transform(image.astype(np.float32)/255.0)
         ret['eeg'] = torch.from_numpy(eeg)
-        ret['label'] = 0 # dummy
+        ret['label'] = label
+        
 
         return ret
 
@@ -204,7 +225,10 @@ def main(config, args):
     generative_model.freeze_first_stage()
     # generative_model.freeze_whole_model()
     # generative_model.unfreeze_cond_stage()
-    generative_model.train_cond_stage_only = False # True
+    if config.training.trainable_cond_model and not( config.training.trainable_generator_model):
+        generative_model.train_cond_stage_only = True # True
+    else:
+        generative_model.train_cond_stage_only = False # True
 
 
     # diffusion trainer
@@ -221,6 +245,8 @@ def main(config, args):
         usewandb=False
     config.training.num_epoch = args.num_epoch
     trainer = DiffusionTrainer(config.training, args.device_counts, usewandb)
+    # generative_model.load_state_dict(torch.load('../../results_task/dream_diffusion/scmbm_4-fs1000-dura200-1k-test_enc-6k-resume/ckpt/current-generator.pth'))
+    # generative_model.cond_stage_model.load_state_dict(torch.load('../../results_task/dream_diffusion/scmbm_4-fs1000-dura200-1k-test_enc-6k-resume/ckpt/current-meg_enc.pth'))
     # fit
     trainer.fit(generative_model, [], train_dataset, val_dataset)
 
