@@ -49,7 +49,7 @@ total_limit:
 # ========path========
 h5_root: ../../../dataset/ssl_dataset/sbj1/regression
 image_encoder_path: null # null is allowed
-save_root: '/home/yainoue/meg2image/results/20231010_sbj01_eegnetdeep_cv_norm_regression_drama_full'
+save_root: '/home/yainoue/meg2image/results/20231004_sbj01_eegnetdeep_cv_norm_regression_drama_full'
 wandb_key_path: /home/yainoue/wandb_inoue.txt
 # ===== Training settings ====
 use_wandb: True
