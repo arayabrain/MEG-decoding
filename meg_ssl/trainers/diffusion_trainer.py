@@ -118,7 +118,7 @@ class DiffusionTrainer(BaseSSLTrainer):
                 self.generator.freeze_first_stage()
                 print('generator is trainable but first stage model')
             else:
-                self.generator.freeze_whole_model()
+                # self.generator.freeze_whole_model()
                 print('generator is frozen')
 
             if self.config.trainable_cond_model:
@@ -127,13 +127,22 @@ class DiffusionTrainer(BaseSSLTrainer):
                 print('meg encoder is trainable')
             else:
                 self.generator.cond_stage_trainable = False
-                self.generator.freeze_cond_stage()
+                self.generator.cond_stage_model.eval()
+                self.generator.cond_stage_model.train = self.disabled_train
+                for param in self.generator.cond_stage_model.parameters():
+                    param.requires_grad = False
+                # self.generator.freeze_cond_stage()
                 print('meg encoder is frozen')
 
 
         os.makedirs(self.reconst_dir, exist_ok=True)
         self.other_setup()
 
+    @staticmethod
+    def disabled_train(self, mode=True):
+        """Overwrite model.train with this function to make sure train/eval mode
+        does not change anymore."""
+        return self
 
     def update_loss_logs(self, loss_dict:dict, loss_logs:dict, prefix:str=None):
         for key, value in loss_dict.items():
@@ -156,9 +165,12 @@ class DiffusionTrainer(BaseSSLTrainer):
 
         with tqdm.tqdm(self.train_loader) as pbar:
             for step, batch in enumerate(pbar):
+                # import pdb; pdb.set_trace()
                 # DEBUG START
                 # befora_state = copy.deepcopy(self.generator.state_dict())
                 # DEBUG END
+                # barch:: eeg: 5,22,208, image: 5,512,512,3,  label: 5, image_raw:{'pixel_values': 5,3,224,224}
+                # import pdb; pdb.set_trace()
                 total_loss, loss_dict, c = self.train_one_step(epoch, step, batch)
                 # DEBUG START
                 # after_state = self.generator.state_dict()
@@ -187,6 +199,7 @@ class DiffusionTrainer(BaseSSLTrainer):
         # c: batch[self.cond_stage_key]をcond_stage encoderに入れたもの
         # label: batch['label']
         # image_raw: batch['image_raw']
+        
         x, c, label, image_raw = self.generator.get_input(batch, self.generator.first_stage_key)
         x = x.to(self.device)
         c = c.to(self.device)
@@ -288,13 +301,13 @@ class DiffusionTrainer(BaseSSLTrainer):
         self.generator.first_stage_model.eval()
         self.generator.cond_stage_model.eval()
         metrics_logs = {}
-        limit=3
+        limit=10
         with torch.no_grad():
             for step, batch in enumerate(self.val_loader):
                 metrics, grid_imgs = self.val_one_step(step, batch, limit=limit)
                 self.update_loss_logs(metrics, metrics_logs, prefix=None)
-                if step == 0:
-                    savefile = os.path.join(self.reconst_dir, f'test-{epoch}.png')
+                if step < 2:
+                    savefile = os.path.join(self.reconst_dir, f'test-{epoch}-{step}.png')
                     grid_imgs.save(savefile)
                     print('generated images is saved as ', savefile)
 
@@ -303,7 +316,9 @@ class DiffusionTrainer(BaseSSLTrainer):
                         limit = None
                         pass
                     else:
-                        break # take so much time
+                        pass # take so much time
+                else:
+                    break
         # import pdb; pdb.set_trace()
         metrics_logs = {key: np.mean(value) for key, value in metrics_logs.items()}
         print(metrics_logs)
@@ -312,6 +327,7 @@ class DiffusionTrainer(BaseSSLTrainer):
     @torch.no_grad()
     def val_one_step(self, step, batch, limit=5)->float:
         # generate
+        # import pdb; pdb.set_trace()
         grid, all_samples, state = self.generator.generate(batch,
                                                            ddim_steps=self.generator.ddim_steps,
                                                            num_samples=1,
@@ -325,6 +341,7 @@ class DiffusionTrainer(BaseSSLTrainer):
         return metric_dict, grid_imgs
 
     def after_epoch(self, epoch:int, train_metrics:dict):
+        print('train: \n', train_metrics)
         if self.global_rank == 0:
             # lr
             for param_group in self.optimizer.param_groups:
@@ -369,6 +386,10 @@ class DiffusionTrainer(BaseSSLTrainer):
             filepath =  os.path.join(self.ckpt_dir, filename.replace('.pth', '-meg_enc.pth'))
             torch.save(self.generator.cond_stage_model.state_dict(), filepath)
             print('cond_stage_model is saved as ', filepath)
+            # attnの分
+            filepath =  os.path.join(self.ckpt_dir, filename.replace('.pth', '-generator.pth'))
+            torch.save(self.generator.state_dict(), filepath)
+            print('generator is saved as ', filepath)
         else:
             filepath =  os.path.join(self.ckpt_dir, filename.replace('.pth', '-generator.pth'))
             torch.save(self.generator.state_dict(), filepath)

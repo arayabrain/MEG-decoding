@@ -41,6 +41,7 @@ def get_model(config, device_count, usewandb):
     image_encoder, image_processor = get_image_encoder(config.image_encoder.name, config.image_encoder.parameters)
     decoder = get_decoder(config.decoder.name, config.decoder.parameters)
     # TODO:
+    # import pdb; pdb.set_trace()
     return meg_encoder, image_encoder, image_processor, decoder
 
 def get_contrastive_trainer(config, device_count, usewandb):
@@ -89,7 +90,6 @@ def run(cfg:OmegaConf, wandb_key_path:str, device_counts:int):
         return batch_meg, batch_image
     # image preprocess function
     image_processing_funcs = []
-
     trainer.fit(meg_encoder, image_encoder, decoder, image_processing_funcs, train_dataset, val_dataset,
                 collate_fn=collate_fn,
             meg_encoder_ckpt_path=cfg.meg_encoder_path,
@@ -138,7 +138,7 @@ if __name__ == '__main__':
     with initialize(config_path='meg_ssl/task_configs/model'):
         cfg.decoder = compose(args.decode_model)
     print('INFO ========= decoder config is overrided by', args.decode_model)
-
+    # import pdb; pdb.set_trace()
     # num_electrodes, fs, bpがh5ファイルに関係している
     if args.h5name is None:
         cfg.h5_root = cfg.h5_root.format(h5_name='fs{}-bp{}_{}'.format(cfg.preprocess.brain_resample_rate, *cfg.preprocess.bandpass_filter))
@@ -148,8 +148,8 @@ if __name__ == '__main__':
         args.exp = args.config
     cfg.training.logdir = cfg.training.logdir.format(exp_name=args.exp)
     cfg.training.ckpt_dir = cfg.training.ckpt_dir.format(exp_name=args.exp)
-
-    cfg.resume_path = args.resume
+    if cfg.resume_path is None:
+        cfg.resume_path = args.resume
     cfg.meg_encoder_path = cfg.meg_encoder_path.format(exp_name=args.exp)
 
     # decoderのinput features は前段のモデルのパラメタに依存する & output featuresはimage encoderの埋め込み次元に依存する
@@ -159,4 +159,10 @@ if __name__ == '__main__':
         else:
             cfg.decoder.parameters.input_features = int(cfg.preprocess.meg_duration * cfg.preprocess.brain_resample_rate / cfg.meg_encoder.parameters.patch_size * cfg.meg_encoder.parameters.embed_dim) # time_len * resample_rate / patch_size * num_dim
         cfg.decoder.parameters.output_features =  512 # image_encoder.vision_embed_dim
+    if cfg.decoder.name == 'mapping':
+        cfg.decoder.parameters.input_features = 1024  # 52 x 1024
+        cfg.decoder.parameters.middle_features = int(cfg.preprocess.meg_duration * cfg.preprocess.brain_resample_rate / cfg.meg_encoder.parameters.patch_size) # time_len * resample_rate / patch_size * num_dim
+        cfg.decoder.parameters.output_features =  512
+        # print(cfg.decoder.parameters.middle_features)
+        # import pdb; pdb.set_trace()
     run(cfg, args.wandbkey, args.device_counts)

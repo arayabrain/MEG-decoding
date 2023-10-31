@@ -49,3 +49,4 @@ data/ImageNet/*
 data/prompts/*
 data/COCO/*
 lightning_logs/*
+tmp*

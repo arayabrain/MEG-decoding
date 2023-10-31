@@ -721,6 +721,12 @@ class UNetModel(nn.Module):
         self.input_blocks.apply(convert_module_to_f32)
         self.middle_block.apply(convert_module_to_f32)
         self.output_blocks.apply(convert_module_to_f32)
+    @staticmethod
+    def get_weight_sum(module):
+        weight_sum = []
+        for name, param in module.named_parameters():
+            weight_sum.append(param.sum().item())
+        print('avg of weight sum is ', np.mean(weight_sum))
 
     def forward(self, x, timesteps=None, context=None, y=None,**kwargs):
         """
@@ -731,6 +737,8 @@ class UNetModel(nn.Module):
         :param y: an [N] Tensor of labels, if class-conditional.
         :return: an [N x C x ...] Tensor of outputs.
         """
+        # print('UNet forward', timesteps)
+        # self.get_weight_sum(self.input_blocks[0])
         assert (y is not None) == (
             self.num_classes is not None
         ), "must specify y if and only if the model is class-conditional"

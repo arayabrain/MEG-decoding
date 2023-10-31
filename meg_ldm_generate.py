@@ -23,14 +23,24 @@ from transformers import AutoProcessor
 from meg_ssl.utils.image_preprocess import numpy2image
 from meg_ssl.trainers.diffusion_trainer import DiffusionTrainer
 # vit_processor = AutoProcessor.from_pretrained("openai/clip-vit-large-patch14")
-
+from torch.utils.data import ConcatDataset
 
 
 class DiffusionDataset():
-    def __init__(self, dataset, img_transform):
+    def __init__(self, dataset, img_transform, ret_image_label=True):
         self.dataset = dataset
         self.img_transform = img_transform
         self.vit_processor = AutoProcessor.from_pretrained("openai/clip-vit-large-patch14")
+
+        # DEBUG::
+        self.ret_image_label = ret_image_label
+        
+        if ret_image_label:
+            if isinstance(self.dataset, ConcatDataset):
+                for ds in self.dataset.datasets:
+                    if hasattr(ds, 'ret_image_label'):
+                        ds.ret_image_label=ret_image_label
+
 
     def __len__(self):
         return len(self.dataset)
@@ -41,16 +51,28 @@ class DiffusionDataset():
 
     def __getitem__(self, idx):
         ret = {}
-        eeg, image = self.dataset[idx]
+        if self.ret_image_label:
+            tuple_data = self.dataset[idx]
+            assert isinstance(tuple_data, tuple)
+            if len(tuple_data)==3:
+                eeg, image, label = tuple_data
+            else:
+                eeg, image = tuple_data
+                label = -1 # dummy
+        else:
+            eeg, image = self.dataset[idx]
+            label = -1 # dummy
         image_raw = numpy2image(image)
         image_raw = self.vit_processor(images=image_raw, return_tensors="pt")
         image_raw['pixel_values'] = image_raw['pixel_values'].squeeze(0)
         ret['image_raw'] = image_raw
         ret['image'] = self.img_transform(image.astype(np.float32)/255.0)
         ret['eeg'] = torch.from_numpy(eeg)
-        ret['label'] = 0 # dummy
+        ret['label'] = label
+        
 
         return ret
+
 
 
 def get_args_parser():
@@ -174,18 +196,27 @@ def get_dataset(cfg):
 
 def image_reconstruction(model, dataset:torch.utils.data.Dataset, state, num_samples:int, 
                          savedir:str, device:str='cuda'):
-    model.to(device)
+    model.to(device).eval()
+    # import pdb; pdb.set_trace()
     for i, batch in enumerate(dataset):
+        # import pdb; pdb.set_trace()
         dict_batch = {
-            'eeg': [batch['eeg'].to(device)],
-            'image': [batch['image'].to(device)]
+            'eeg': torch.stack([batch['eeg'].to(device)]),
+            'image': torch.stack([batch['image'].to(device)]),
+            'label':torch.from_numpy(np.array([batch['label']]).astype(np.float32))
         }
-        grid, array, state = model.generate(dict_batch, 
-                                            num_samples, 
-                                            ddim_steps=50, 
-                                            HW=None, 
-                                            limit=5, 
-                                            state=state)
+
+        # grid, array, state = model.generate(dict_batch, 
+        #                                     num_samples=num_samples, 
+        #                                     ddim_steps=50, 
+        #                                     HW=None, 
+        #                                     limit=5, 
+        #                                     state=state)
+    
+        grid, array, state = model.generate(dict_batch,
+                                            ddim_steps=250,
+                                            num_samples=num_samples,
+                                            limit=5)
         
         savefile_path = os.path.join(savedir, f'{i}.png')
         # print(grid.shape, grid.max(), grid.min())
@@ -199,12 +230,12 @@ def image_reconstruction(model, dataset:torch.utils.data.Dataset, state, num_sam
             array = np.transpose(array, (0, 2,3,1))
         else:
             array = np.transpose(array[0], (0, 2,3,1))
-        # for j, img in enumerate(array):
-        #     image = Image.fromarray(img)
-        #     img_name = str(j-1) if j > 0 else 'gt'
-        #     image.save(os.path.join(savedir, f'{i}-{img_name}.png'))
-        
-        # break
+        for j, img in enumerate(array):
+            image = Image.fromarray(img)
+            img_name = str(j-1) if j > 0 else 'gt'
+            image.save(os.path.join(savedir, f'{i}-{img_name}.png'))
+        # if i > 10:
+        #   break
         
 
 
@@ -234,28 +265,33 @@ def main(config, args):
     generative_model.learning_rate = config.training.lr
     generative_model.eval_avg = config.training.eval_avg
 
-    
-    # load model weight
-    weightpath = os.path.join(f'../../results_task/dream_diffusion/{args.meg_exp}-{args.ldf_exp}/ckpt/current-generator.pth')
-    model_info = torch.load(weightpath, map_location='cpu')
-    print('pretrained model is loaded from ', weightpath)
-    before_weight = copy.deepcopy(generative_model.cpu().state_dict())
+    state = None
+    # # load model weight
+    # weightpath = os.path.join(f'../../results_task/dream_diffusion/{args.meg_exp}-{args.ldf_exp}/ckpt/current-generator.pth')
+    # model_info = torch.load(weightpath, map_location='cpu')
+    # print('pretrained model is loaded from ', weightpath)
+    # before_weight = copy.deepcopy(generative_model.cpu().state_dict())
+    # print('generative_model last layer summation: ', generative_model.state_dict()['image_embedder.transformer.visual_projection.weight'].sum(), get_total_mean(generative_model.state_dict()))
+    # state = None
+    # if 'model_state_dict' in model_info.keys():
+    #     generative_model.load_state_dict(model_info['model_state_dict'])
+    #     state = model_info['state']
+    # else:
+    #     generative_model.load_state_dict(model_info) # (model_info)
+    #     state = None
+    # ## DEBUG:::::::::::::
+    generative_model.load_state_dict(torch.load('../../results_task/dream_diffusion/scmbm_4-fs1000-dura200-test_enc-6k/ckpt/current-generator.pth'))
+    generative_model.cond_stage_model.load_state_dict(torch.load('../../results_task/dream_diffusion/scmbm_4-fs1000-dura200-test_enc-6k/ckpt/current-meg_enc.pth'))
+
     print('generative_model last layer summation: ', generative_model.state_dict()['image_embedder.transformer.visual_projection.weight'].sum(), get_total_mean(generative_model.state_dict()))
-    if 'model_state_dict' in model_info.keys():
-        generative_model.load_state_dict(model_info['model_state_dict'])
-        state = model_info['state']
-    else:
-        generative_model.init_from_ckpt(weightpath) # (model_info)
-        state = None
-    print('generative_model last layer summation: ', generative_model.state_dict()['image_embedder.transformer.visual_projection.weight'].sum(), get_total_mean(generative_model.state_dict()))
-    compare_weight(before_weight, generative_model.cpu().state_dict())
+    # compare_weight(before_weight, generative_model.cpu().state_dict())
     # print('=============== before vs model_info==========')
     # compare_weight(before_weight, model_info)
     # import pdb; pdb.set_trace()
     # exit()
 
     # trainable settings
-    generative_model.unfreeze_whole_model()
+    generative_model.freeze_whole_model()
     generative_model.freeze_first_stage()
     # generative_model.freeze_whole_model()
     # generative_model.unfreeze_cond_stage()
@@ -265,8 +301,10 @@ def main(config, args):
     savedir = os.path.join(f'../../results_task/dream_diffusion/{args.meg_exp}-{args.ldf_exp}/reconst/eval')
     os.makedirs(savedir, exist_ok=True)
     num_samples = 3
-
-    image_reconstruction(generative_model, train_dataset, state, num_samples, savedir)
+    # import pdb; pdb.set_trace()
+    # assert len(val_dataset) == 1200
+    val_dataset[0] # image_namesのindex errorがきが
+    image_reconstruction(generative_model, val_dataset, state, num_samples, savedir)
     print('end')
 
 def get_total_mean(state):
@@ -288,7 +326,7 @@ def compare_weight(state1, state2):
 if __name__ == '__main__':
     args = get_args_parser()
 
-    set_seed(40)
+    set_seed(49)
     with initialize(config_path='meg_ssl/generate_configs/'):
         meg_cfg = compose(args.meg_config)
     if args.meg_encoder is not None:

@@ -119,7 +119,8 @@ class AlignTrainer(BaseSSLTrainer):
                      train_dataset:Dataset, val_dataset:Dataset, collate_fn=None,
                      meg_encoder_ckpt_path:str=None,
                      image_encoder_ckpt_path:str=None,
-                     decoder_ckpt_path:str=None):
+                     decoder_ckpt_path:str=None,
+                     ):
         self.meg_encoder = meg_encoder
         self.image_encoder = image_encoder
         self.decoder = decoder
@@ -171,6 +172,12 @@ class AlignTrainer(BaseSSLTrainer):
         self.meg_encoder = self.meg_encoder.to(self.device).eval()
         self.image_encoder = self.image_encoder.to(self.device).eval()
         self.decoder = self.decoder.to(self.device).eval()
+        if 'mask_ratio' in self.config.keys():
+            self.mask_ratio = self.config.mask_ratio
+            self.mask_token = torch.zeros(1, 1, 1024).to(self.device)
+        else:
+            self.mask_ratio = -1
+        print('Mask Ratio:: ', self.mask_ratio)
 
         
 
@@ -191,17 +198,44 @@ class AlignTrainer(BaseSSLTrainer):
         epoch_acc = []
         with tqdm.tqdm(self.train_loader) as pbar:
             for step, batch in enumerate(pbar):
+                # print('meg encoder weight')
+                # self.show_weight(self.meg_encoder)
                 loss, acc = self.train_one_step(epoch, step, batch)
-                pbar.set_description("[Epoch {}] step={},loss={}".format(
-                    epoch, step, np.mean(loss)))
+                pbar.set_description("[Epoch {}] step={},loss={}, acc={}".format(
+                    epoch, step, np.mean(loss), np.mean(acc)))
                 epoch_loss.append(loss)
                 epoch_acc.append(acc)
-        return {'train_loss': np.mean(epoch_loss), 'train_acc': np.mean(epoch_acc)}
+        train_ret = {'train_loss': np.mean(epoch_loss), 'train_acc': np.mean(epoch_acc)}
+        # temperature
+        if self.config.criterion == 'clip':
+            temp = self.criterion.temp
+            train_ret['clip_temp'] = temp.item()
+        return train_ret
+    @staticmethod
+    def show_weight(nn_module):
+        weight_sum = []
+        for k, v in nn_module.named_parameters():
+            # print(k, v.sum())
+            weight_sum.append(v.sum().item())
+        print(np.mean(weight_sum))
+
+    def recover_mask(self, x, ids_restore):
+        if ids_restore is not None:
+            mask_tokens = self.mask_token.repeat(x.shape[0], ids_restore.shape[1] + 1 - x.shape[1], 1)
+            x_ = torch.cat([x[:, 1:, :], mask_tokens], dim=1)  # no cls token
+            # x_ = torch.cat([x, mask_tokens], dim=1)  # no cls token
+            x_ = torch.gather(x_, dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x.shape[2]))  # unshuffle
+            x = torch.cat([x[:, :1, :], x_], dim=1)  # append cls token
+            # x = x + self.decoder_pos_embed
+            return x
 
     def train_one_step(self, epoch, step, batch)->float:
         self.optimizer.zero_grad()
 
         batch_eeg, batch_image = batch
+        # print([b.sum() for b in batch_image]) # TODO: 同じimageが一つbatchに大量にある。 tensor(-252113.3438)
+        # import pdb; pdb.set_trace()
+        # lr scheduling...
         if step % self.config.accum_iter == 0:
             ut.adjust_learning_rate(self.optimizer, step / len(self.train_loader) + epoch, self.config)
         samples = batch_eeg # data_dcit['eeg']
@@ -212,8 +246,13 @@ class AlignTrainer(BaseSSLTrainer):
             batch_image = preprocessor(batch_image)
 
         with torch.cuda.amp.autocast(enabled=True):
-            latent, mask, ids_restore = self.meg_encoder.forward_encoder(samples, -1, self.config.global_pool)
-            assert mask is None
+            if self.mask_ratio > 0:
+                latent, mask, ids_restore = self.meg_encoder.forward_encoder(samples, self.mask_ratio, self.config.global_pool)
+                latent = self.recover_mask(latent, ids_restore)
+            else: 
+                latent, mask, ids_restore = self.meg_encoder.forward_encoder(samples, -1, self.config.global_pool)
+            
+                assert mask is None
             if latent.ndim ==3:
                 latent_wo_cls = latent[:, 1:, :] # torch.Size([100, 52, 1024])  208(time_len) / 4 (patch_size) = 52 (num_patch)
             else: 
@@ -225,14 +264,16 @@ class AlignTrainer(BaseSSLTrainer):
                 target = self.image_encoder.encode_image(batch_image)
             else:
                 with torch.no_grad():
-                    target = self.image_encoder.encode_image(batch_image)
+                    target = self.image_encoder.encode_image(batch_image)# torch.Size([50, 512])
+            # import pdb; pdb.set_trace()
             loss = self.criterion(pred, target)
             acc = self.calc_acc(pred, target, self.device)
 
-        # self.scaler.scale(loss).backward(create_graph=True)
-        # self.scaler.unscale_(self.optimizer)
-        # self.scaler.step(self.optimizer)
-        # self.scaler.update()
+            # self.scaler.scale(loss).backward(create_graph=True)
+            # self.scaler.unscale_(self.optimizer)
+            # self.scaler.step(self.optimizer)
+            # self.scaler.update()
+        # Exits the context manager before backward()  see. https://pytorch.org/docs/stable/amp.html
         loss.backward()
         self.optimizer.step()
 
@@ -240,6 +281,8 @@ class AlignTrainer(BaseSSLTrainer):
 
         if not math.isfinite(loss_value):
             print(f"Loss is {loss_value}, stopping training at step {step} epoch {epoch}")
+            print('pred: ', pred)
+            print('target: ', target)
             sys.exit(1)
 
         self.optimizer.zero_grad()
@@ -258,8 +301,8 @@ class AlignTrainer(BaseSSLTrainer):
                 loss, acc = self.val_one_step(step, batch)
                 val_loss.append(loss)
                 val_acc.append(acc)
-        print('val loss: {} acc: {}'.format(np.mean(val_loss), np.mean(val_acc)))
-        return {'val_loss': np.mean(val_loss), 'val_acc': np.mean(val_acc)}
+        print('val loss: {} acc: {}'.format(np.nanmean(val_loss), np.nanmean(val_acc)))
+        return {'val_loss': np.nanmean(val_loss), 'val_acc': np.nanmean(val_acc)}
 
     @torch.no_grad()
     def val_one_step(self, step, batch)->float:
@@ -298,9 +341,9 @@ class AlignTrainer(BaseSSLTrainer):
         return top1accuracy
 
     def save_model(self, filename:str):
-        filepath =  os.path.join(self.ckpt_dir, filename)
-        torch.save(self.meg_encoder.state_dict(),filepath)
-        print('meg_encoder is saved as ', filepath)
+        filepath =  os.path.join(self.ckpt_dir, 'decoder_'+filename)
+        torch.save(self.decoder.state_dict(),filepath)
+        print('decoder is saved as ', filepath)
         if self.train_image_encoder:
             if self.config.image_encoder_finetune=='lora':
                 filepath = os.path.join(self.ckpt_dir, 'peft-image_encoder_' + filename)

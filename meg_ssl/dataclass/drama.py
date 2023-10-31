@@ -10,6 +10,7 @@ mne.set_log_level(verbose="WARNING")
 from omegaconf import OmegaConf
 import pandas as pd
 import random
+from tqdm import tqdm
 import cv2
 try:
     from meg_decoding.video_utils.video_controller import VideoController
@@ -78,9 +79,34 @@ class SessionDatasetDrama(Dataset):
         # baseline|meg_frame|meg_onset|meg_duration
 
         self.prepare_data()
-        self.deterministic = False
+        self.deterministic = True
+        # import pdb; pdb.set_trace()
+        presavedir_root = '/work/project/MEG_GOD/yainoue/drama_presave'
+        if self.deterministic:
+            movie_file_name = movie_path.split('/')[-1].replace('.mp4', '')
+            self.presavedir = os.path.join(presavedir_root, movie_file_name)
+            os.makedirs(self.presavedir, exist_ok=True)
+            self.presave_frames(self.presavedir)
 
+        # self.normalize_meg = False
+        # if self.normalize_meg:
+        #     self.meg_std = 
+        #     self.meg_mean = 
 
+    
+    def presave_frames(self, presavedir):
+        print('presave is running ... PRESAVEDIR: ', presavedir)
+        for target_idx in tqdm(self.indices):
+            movie_frame = self.movie_triggers[target_idx]
+            savefile_path = os.path.join(presavedir, f'{movie_frame}.npy')
+            if os.path.exists(savefile_path):
+                continue
+            image = self.vc.get_image_at(movie_frame) # get_frame(movie_frame)
+            image = image[self.movie_crop_pt1[0]:self.movie_crop_pt2[0], self.movie_crop_pt1[1]:self.movie_crop_pt2[1], :] # crop
+            for func_ in self.image_preprocs:
+                image = func_(image)
+            np.save(savefile_path, image)
+        
 
     def __len__(self)->int:
         return len(self.indices)
@@ -114,14 +140,19 @@ class SessionDatasetDrama(Dataset):
         if self.only_meg:
             return ROI_MEG_Data # , movie_frame # movie_frame is dummy
         else:
-            print('load image', dist.get_rank())
-            image = self.vc.get_image_at(movie_frame) # get_frame(movie_frame)
-            print('load image end')
-            cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            image = image[self.movie_crop_pt1[0]:self.movie_crop_pt2[0], self.movie_crop_pt1[1]:self.movie_crop_pt2[1], :] # crop
-            for func_ in self.image_preprocs:
-                image = func_(image)
-                # default: image channel is placed at last dimension
+            if self.deterministic:
+                imagefile_path = os.path.join(self.presavedir, f'{movie_frame}.npy')
+                image = np.load(imagefile_path)
+            else:
+                # print('load image')
+                image = self.vc.get_image_at(movie_frame) # get_frame(movie_frame)
+                # print('load image end')
+                # cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                image = image[self.movie_crop_pt1[0]:self.movie_crop_pt2[0], self.movie_crop_pt1[1]:self.movie_crop_pt2[1], :] # crop
+                for func_ in self.image_preprocs:
+                    image = func_(image)
+                    # default: image channel is placed at last dimension
+                # import pdb; pdb.set_trace()
             return ROI_MEG_Data, image
 
     def split_data(self):
@@ -151,7 +182,12 @@ class SessionDatasetDrama(Dataset):
         else:
             raise ValueError('invalid split {}'.format(self.split))
         if self.num_section_limit is not None:
+            # DEBUG start::::: 
+            print('CAUTION: DEBUG MODE::: drama.py split_data-- random limitation')
+            np.random.shuffle(self.indices)
+            # DEBUG end ::::
             self.indices = self.indices[:self.num_section_limit] # should be random ?
+            
         self.movie_triggers = movie_triggers
         self.meg_triggers = meg_triggers
 
@@ -237,7 +273,7 @@ class SessionDatasetDrama(Dataset):
 
     @staticmethod
     def get_video_controler(movie_path)->VideoController:
-        return VideoController(movie_path)
+        return VideoController(movie_path, use_torchvision=True) # Mod by inoue 20230906)
 
     @staticmethod
     def get_movie_trigger(movie_trigger_path:str, trigger_label:int)->np.ndarray:

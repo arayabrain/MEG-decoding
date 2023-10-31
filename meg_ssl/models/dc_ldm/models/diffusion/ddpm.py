@@ -406,11 +406,15 @@ class DDPM(pl.LightningModule):
                     if count >= limit:
                         break
                 latent = item[0] # fmri embedding
+                print('generate latent: ', latent.shape, latent.max(), latent.min())
                 gt_image = rearrange(item[1], 'h w c -> 1 c h w') # h w c
                 print(f"rendering {num_samples} examples in {ddim_steps} steps.")
                 # c = model.get_learned_conditioning(repeat(latent, 'h w -> c h w', c=num_samples).to(self.device))
-                c, re_latent = model.get_learned_conditioning(repeat(latent, 'h w -> c h w', c=num_samples).to(self.device))
-                print(c.shape, c.max(), c.min())
+                # self.get_learned_conditioningではダメなのか？
+                # label = data['label'][count].unsqueeze(0).to(self.device)
+                c, re_latent = self.get_learned_conditioning(repeat(latent, 'h w -> c h w', c=num_samples).to(self.device)) #, l=data['label'][count].unsqueeze(0)) # DEBUG
+                # c, re_latent = model.get_learned_conditioning(repeat(latent, 'h w -> c h w', c=num_samples).to(self.device))
+                print('generate C: ', c.shape, c.max(), c.min())
                 # c = torch.rand_like(c)
                 # import pdb; pdb.set_trace()
                 samples_ddim, _ = sampler.sample(S=ddim_steps,
@@ -608,6 +612,7 @@ class LatentDiffusion(DDPM):
             conditioning_key = 'concat' if concat_mode else 'crossattn'
         if cond_stage_config == '__is_unconditional__':
             conditioning_key = None
+            raise ValueError('in MEG2image experiment, conditoning must be s')
         ckpt_path = kwargs.pop("ckpt_path", None)
         ignore_keys = kwargs.pop("ignore_keys", [])
         super().__init__(conditioning_key=conditioning_key, *args, **kwargs)
@@ -657,6 +662,7 @@ class LatentDiffusion(DDPM):
             x = super().get_input(batch, self.first_stage_key)
             x = x.to(self.device)
             encoder_posterior = self.encode_first_stage(x)
+
             z = self.get_first_stage_encoding(encoder_posterior).detach()
             del self.scale_factor
             self.register_buffer('scale_factor', 1. / z.flatten().std())
@@ -755,8 +761,13 @@ class LatentDiffusion(DDPM):
             raise NotImplementedError(f"encoder_posterior of type '{type(encoder_posterior)}' not yet implemented")
         return self.scale_factor * z
 
-    def get_learned_conditioning(self, c):
-        # self.cond_stage_model.eval()
+    def get_learned_conditioning(self, c, l=None): # l is for debug
+        if not self.cond_stage_trainable:
+            self.cond_stage_model.eval()
+            # print('cond_stage_model set to eval')
+        else:
+            self.cond_stage_model.train()
+            # import pdb;pdb.set_trace()
         if hasattr(self.cond_stage_model, 'encode') and callable(self.cond_stage_model.encode):
             c, re_latent = self.cond_stage_model.encode(c)
             # c = self.cond_stage_model.encode(c)
@@ -764,6 +775,15 @@ class LatentDiffusion(DDPM):
             c, re_latent = self.cond_stage_model(c)
             # c = self.cond_stage_model(c)
         # return c
+        # DEBUG:::::::::::::::::
+        if l is not None:
+            # import pdb; pdb.set_trace()
+            assert not (l == -1).cpu().numpy().all()
+            l = l/1200 - 0.5
+            l = l.unsqueeze(1).unsqueeze(2)
+            l = l.cuda()
+            newc = torch.ones_like(c) * l
+            c = newc + 0*c
         return c, re_latent
 
     def meshgrid(self, h, w):
@@ -870,9 +890,18 @@ class LatentDiffusion(DDPM):
         if bs is not None:
             x = x[:bs]
         x = x.to(self.device)
-        encoder_posterior = self.encode_first_stage(x)
+        # この時のimageは [-1, 1]の範囲に正規化されている必要がある
+        # print('get_input', x.shape, x.max(), x.min())# get_input torch.Size([5, 3, 512, 512]) tensor(1., device='cuda:0') tensor(-1., device='cuda:0')
+        # x = x / 255
+        # x = 2 * x - 1
+        encoder_posterior = self.encode_first_stage(x) # <meg_ssl.models.dc_ldm.modules.distributions.distributions.DiagonalGaussianDistribution object at 0x7f479e027550>
         # print('encoder_posterior.shape')
         # print(encoder_posterior.shape)
+
+        # import pdb; pdb.set_trace()
+        # debug: encoder_posterior.sample()の結果をdecoderに入れると正しく画像が再構成できていた
+        # resynth_image = self.decode_first_stage(encoder_posterior.sample())
+
         z = self.get_first_stage_encoding(encoder_posterior).detach()
         # print('z.shape')
         # print(z.shape)
@@ -896,13 +925,15 @@ class LatentDiffusion(DDPM):
             # print(force_c_encode)
             if not self.cond_stage_trainable or force_c_encode : # cond_stage_trainable=True, force_c_encode=False
                 # print('get learned condition')
+
                 if isinstance(xc, dict) or isinstance(xc, list):
                     # import pudb; pudb.set_trace()
                     # cond stage model でEncode
+                    
                     c, re_latent = self.get_learned_conditioning(xc)
                     # c = self.get_learned_conditioning(xc)
                 else:
-                    c, re_latent = self.get_learned_conditioning(xc.to(self.device))
+                    c, re_latent = self.get_learned_conditioning(xc.to(self.device)) # , batch['label'])# DEBUG
                     # c = self.get_learned_conditioning(xc.to(self.device))
             else:
                 c = xc
@@ -1080,7 +1111,7 @@ class LatentDiffusion(DDPM):
         # print('x.shape')
         # print(x.shape)
         # print('c.shape')
-        # print(c.shape)
+        # print('Shared step: sum of Condition  ', c.sum)
         # import pdb; pdb.set_trace()
         # for name, parameter in self.named_parameters():
         #     if parameter.requires_grad:
@@ -1139,15 +1170,16 @@ class LatentDiffusion(DDPM):
                 break
 
     def forward(self, x, c, label, image_raw, *args, **kwargs):
-        # print(self.num_timesteps)
+        # print(self.num_timesteps) # 10000
         t = torch.randint(0, self.num_timesteps, (x.shape[0],), device=self.device).long()
+        # import pdb; pdb.set_trace()
         # print('t.shape')
         # print(t.shape)
         if self.model.conditioning_key is not None:
             assert c is not None
             imgs = c
             # ここでmegをencodeする。get_inputでencodeすることも可能
-            if self.cond_stage_trainable:
+            if self.cond_stage_trainable: # CLIPと併用する際にここでないとダメだった？
                 # c = self.get_learned_conditioning(c)
                 c, re_latent = self.get_learned_conditioning(c)
                 # print('c.shape')
@@ -1508,6 +1540,9 @@ class LatentDiffusion(DDPM):
                                            force_c_encode=True,
                                            return_original_cond=True,
                                            bs=N)
+        # import pdb; pdb.set_trace()
+        d_c = self.decode_first_stage(c)
+
         N = min(x.shape[0], N)
         n_row = min(x.shape[0], n_row)
         log["inputs"] = x
@@ -1643,7 +1678,7 @@ class LatentDiffusion(DDPM):
                     'frequency': 1
                 }]
             return [opt], scheduler
-
+            
         return opt
 
     @torch.no_grad()
@@ -1672,7 +1707,8 @@ class DiffusionWrapper(pl.LightningModule):
         elif self.conditioning_key == 'crossattn':
             # TODO: check c_concat or c_crossattn 
             # c_crossattn: len=1, index=0のtensorのshape:[5,77,768]
-            cc = torch.cat(c_crossattn, 1)
+            cc = torch.cat(c_crossattn, 1)#  * 5
+            # print('DiffusionWrapper X: ', x.sum(), x.max(), x.min(), x.shape, 'cond: ', cc.sum(), cc.max(), cc.min(), cc.shape)
             out = self.diffusion_model(x, t, context=cc)
             # import pdb; pdb.set_trace()
         elif self.conditioning_key == 'hybrid':

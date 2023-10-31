@@ -106,6 +106,8 @@ def get_meg_data(meg_filepath:str, label_filepath:str, trigger_filepath:str,
 
 def roi(args)->list:
     region:list = args.region
+    if not os.path.exists(args.ch_region_path):
+        args.ch_region_path = args.ch_region_path.replace('./', '../')
     with open(args.ch_region_path, 'r') as f:
         ch_region_info = json.load(f)
     roi_channels = []

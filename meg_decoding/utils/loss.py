@@ -61,9 +61,13 @@ class CLIPLoss(nn.Module):
         # self.targets = torch.zeros(size=(batch_size, )).long() # that's for the slow method
         # self.registered_targets = False
         # self.batch_size = args.batch_size
-        self.temp = nn.Parameter(torch.tensor([float(args.init_temperature)]))
+        if 'trainable' in args.keys() and (not args.trainable):
+            self.temp = torch.tensor([float(args.init_temperature)])
+        else:
+            self.temp = nn.Parameter(torch.tensor([float(args.init_temperature)]))
+        self.epsilon = 1e-5
 
-    def forward(self, x, y, fast=True, return_logits=False):
+    def forward(self, x, y, fast=False, return_logits=False):
         batch_size = x.size(0)
         assert batch_size > 1, "Batch size must be greater than 1."
         # if not self.registered_targets:
@@ -72,10 +76,18 @@ class CLIPLoss(nn.Module):
         targets = torch.arange(batch_size, requires_grad=False).long().to(self.device)
 
         if not fast:
-            # less efficient way
-            x_ = rearrange(x, "b f t -> 1 b (f t)")
-            y_ = rearrange(y, "b f t -> b 1 (f t)")
+            if x.dim() == 3: # b x feature x time
+                # less efficient way
+                x_ = rearrange(x, "b f t -> 1 b (f t)")
+                y_ = rearrange(y, "b f t -> b 1 (f t)")
+            else: # b x f
+                # less efficient way
+                x_ = rearrange(x, "b f -> 1 b f")
+                y_ = rearrange(y, "b f -> b 1 f")
+
             logits = self.compute_similarity(x_, y_)  # s
+            logits *= torch.exp(self.temp)
+
 
             # unnecessary steps for the less efficient way (this might be needed for fancy contrastive losses)
             # positives = torch.diag(similarity_matrix, 0).view(-1,1)
@@ -89,8 +101,8 @@ class CLIPLoss(nn.Module):
             y = y.reshape(batch_size, -1)
 
             # NOTE: scale the embeddings to unit norm
-            x = x / x.norm(dim=-1, keepdim=True)
-            y = y / y.norm(dim=-1, keepdim=True)
+            x = x / (x.norm(dim=-1, keepdim=True) + self.epsilon)
+            y = y / (y.norm(dim=-1, keepdim=True) + self.epsilon)
 
             # get dot products
             logits = torch.matmul(x, y.T)

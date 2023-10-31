@@ -1,5 +1,6 @@
 import cv2
 import os
+from tqdm import tqdm
 try:
     from meg_decoding.video_utils.video_controller import VideoController
 except ModuleNotFoundError:
@@ -52,7 +53,7 @@ filename_list = [
     'ID10_GhostInTheShellVol1-1_id10_MEG_DATAPixx_part2.mp4'
 ]
 
-for filename in filename_list:
+for filename in filename_list[:1]:
     save_dir = os.path.join(save_root, filename.split('.')[0])
     os.makedirs(save_dir, exist_ok=True)
     video_path = os.path.join(file_root, filename)
@@ -60,8 +61,8 @@ for filename in filename_list:
     print('video name: ',  filename)
     num_frames = vc.frame_num
     print('{} frames'.format(num_frames))
-    for i in range(num_frames):
-        frame = vc.get_frame(i)
+    for i in tqdm(range(num_frames)):
+        frame = vc.get_image_at(i)
         cv2.imwrite(os.path.join(save_dir, '{}.png'.format(i)), frame)
 
     print('save images in ', save_dir)

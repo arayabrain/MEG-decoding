@@ -9,9 +9,10 @@ preprocess: base
 dataset_name:
     train:
         # drama: sbj_1-session_all # all 1_3, 1~3
-        GOD: sbj_1-train-session_1 # _2_3_4_5_7_8_9_10_11
+        GOD: sbj_1-train-session_1_2_3_4_5_7_8_9_10_11
     val:
-        GOD: sbj_1-train-session_6 # _12
+        # GOD: sbj_1-train-session_6_12 # 6 # _12
+        GOD: sbj_1-val-session_all # 6 # _12
 dataset_yaml:
     # drama: drama/drama_vc.yaml # drama_config.yaml # region 160 ch
     GOD: GOD/god_vc.yaml # god_config.yaml
@@ -24,8 +25,8 @@ total_limit:
 
 # ========path========
 h5_root: ../../../dataset/ssl_dataset/{h5_name}
-resume_path: null
-meg_encoder_path: '../../results_ssl/{exp_name}/ckpt/best.pth' #
+resume_path: null # ../../results_task/dream_diffusion/scmbm_4-fs1000-dura200-test_gen_enc-overfit/ckpt/last-generator.pth
+meg_encoder_path: '../../results_ssl/{sbj_name}/{exp_name}/ckpt/best.pth' #
 image_encoder_path: null # null is allowed
 pretrain_gm_path: ../dreamdiffusion/pretrains
 
@@ -35,12 +36,12 @@ training:
     val_check_interval: 10
     num_workers: 4 # 4
     batch_size: 5
-    lr: 5.3e-5
-    min_lr: 0
+    lr: 1e-4 # 5.3e-5 #  1e-6 # 5.3e-5 # 1e-4
+    min_lr: 1e-5 # 9e-7 # 5e-6 # 5e-5
     weight_decay: 0.05
     num_epoch: 500
-    warmup_epochs: 40
-    # clip_grad: 0.8
+    warmup_epochs: 5 # 40
+    clip_grad: 0.8
     accum_iter: 1
     # ========dream diffusion========
     img_size: 512
@@ -53,13 +54,13 @@ training:
     cls_tune: False
     eval_avg: True
     num_samples: 5
-    ddim_steps: 250
+    ddim_steps: 50
     HW: null
     model_meta: null
     checkpoint_path: null
     allow_full_validation: False
-    trainable_cond_model: True
-    trainable_generator_model: True
+    trainable_cond_model: True # False
+    trainable_generator_model: False #True
 
     logdir: '../../results_task/dream_diffusion/{exp_name}/log'
     ckpt_dir: '../../results_task/dream_diffusion/{exp_name}/ckpt'
