@@ -1,4 +1,5 @@
 import os
+from typing import Callable
 from omegaconf import OmegaConf
 from hydra import compose, initialize
 from typing import List, Tuple, Dict, Union
@@ -43,12 +44,13 @@ def parse_dataset(dataset_names:dict, dataset_yamls:dict, preproc_config:OmegaCo
                     tmp_dataset_info_list = get_god_dataset_info(session_info, h5_dir)
                 else:
                     raise ValueError('name {} is not supported'.format(name))
-                
+
 
                 dataset_info_list += tmp_dataset_info_list
                 dataset_config_list += [cfg] * len(dataset_info_list)
-                num_trial_limits += [int(num_trial_limits_dict[split][name]/len(dataset_info_list))] * len(dataset_info_list)
-
+                # FIX BUG: dataset_info_list -> tmp_dataset_info_list
+                num_trial_limits += [int(num_trial_limits_dict[split][name]/len(tmp_dataset_info_list))] * len(tmp_dataset_info_list)
+            # import pdb; pdb.set_trace()
             split_datasets[split] = collect_session_dataset(dataset_info_list, dataset_config_list, preproc_config,
                         num_trial_limits, image_preprocs, meg_preprocs, only_meg, on_memory, ret_image_label)
     return split_datasets
@@ -68,7 +70,6 @@ def collect_session_dataset(dataset_info_list:List[Dict], dataset_config_list:Li
             print('skipping the following dataset: ', dataset.meg_path)
             continue
         dataset_list.append(dataset)
-
     return ConcatDataset(dataset_list)
 
 
@@ -79,7 +80,7 @@ def get_session_dataset(dataset_info:dict, dataset_config:OmegaConf, preproc_con
     if dataset_config.name == 'drama':
         return SessionDatasetDrama(dataset_config, preproc_config, dataset_info['meg_path'], dataset_info['movie_path'],
                                    dataset_info['movie_trigger_path'], dataset_info['meg_trigger_path'], dataset_info['h5_file_name'],
-                                   dataset_info['movie_crop_pts'], sbj_name=dataset_info['sbj_name'], split=dataset_info['split'], 
+                                   dataset_info['movie_crop_pts'], sbj_name=dataset_info['sbj_name'], split=dataset_info['split'],
                                    num_trial_limit=num_trial_limit, image_preprocs=image_preprocs, meg_preprocs=meg_preprocs,
                                    only_meg=only_meg, on_memory=on_memory)
     elif dataset_config.name == 'GOD':
@@ -89,3 +90,23 @@ def get_session_dataset(dataset_info:dict, dataset_config:OmegaConf, preproc_con
                                  num_trial_limit=num_trial_limit, only_meg=only_meg, on_memory=on_memory, ret_image_label=ret_image_label)
     else:
         raise ValueError('dataset_config.name {} is not supported'.format(dataset_config.name))
+
+
+class MultiProcessDataLoader():
+    def __init__(self, dataset:ConcatDataset, batch_size:int, shuffle:bool, num_workers:int, collate_fn:Callable):
+        self.concat_dataset = dataset
+        self.dataset_size = len(self.concat_dataset)
+        self.num_datasets = len(self.concat_dataset.datasets)
+        self.dataset_size_list = [len(dataset) for dataset in self.concat_dataset.datasets]
+        assert self.num_datasets >= num_workers, 'too much worker {} < {}'.format(self.num_datasets, num_workers)
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.collate_fn = collate_fn
+
+        self.lager_batch_size = self.batch_size > self.num_datasets
+
+    def __len__(self):
+        return self.dataset_size // self.batch_size
+
+    def __getitem__():
+        pass
