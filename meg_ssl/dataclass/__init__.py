@@ -6,9 +6,11 @@ from typing import List, Tuple, Dict, Union
 from torch.utils.data import Sampler, Dataset, ConcatDataset
 from .drama import SessionDatasetDrama
 from .god import SessionDatasetGOD
+from .things import SessionDatasetThings
 from torch.utils.data import ConcatDataset
 from meg_ssl.ssl_configs.dataset.drama.dataset_info import get_dataset_info as get_drama_dataset_info
 from meg_ssl.ssl_configs.dataset.GOD.dataset_info import get_dataset_info as get_god_dataset_info
+from meg_ssl.ssl_configs.dataset.things.dataset_info import get_dataset_info as get_things_dataset_info
 
 
 BLACK_MAT_FILE_LIST = ['sbj01/ID08_DreamGirlsVol1_1_id8_MEG_DATAPixx_part4.mat',
@@ -42,6 +44,8 @@ def parse_dataset(dataset_names:dict, dataset_yamls:dict, preproc_config:OmegaCo
                     tmp_dataset_info_list = get_drama_dataset_info(session_info, h5_dir, split)
                 elif name == 'GOD':
                     tmp_dataset_info_list = get_god_dataset_info(session_info, h5_dir)
+                elif name == 'things':
+                    tmp_dataset_info_list = get_things_dataset_info(session_info, h5_dir)
                 else:
                     raise ValueError('name {} is not supported'.format(name))
 
@@ -88,6 +92,11 @@ def get_session_dataset(dataset_info:dict, dataset_config:OmegaConf, preproc_con
                                  dataset_info['meg_trigger_path'], dataset_info['meg_label_path'], dataset_info['h5_file_name'],
                                  dataset_info['image_id_path'], sbj_name=dataset_info['sbj_name'], image_preprocs=image_preprocs, meg_preprocs=meg_preprocs,
                                  num_trial_limit=num_trial_limit, only_meg=only_meg, on_memory=on_memory, ret_image_label=ret_image_label)
+    elif dataset_config.name == 'things':
+        return SessionDatasetGOD(dataset_config, preproc_config, dataset_info['session_id'], dataset_info['image_root'],
+                                 dataset_info['meg_root'], dataset_info['h5_file_name'], dataset_info['sbj_name'],
+                                 image_preprocs=image_preprocs, meg_preprocs=meg_preprocs,
+                                 num_trial_limit=num_trial_limit, only_meg=only_meg, on_memory=on_memory, ret_image_label=ret_image_label, split=dataset_info['split'])
     else:
         raise ValueError('dataset_config.name {} is not supported'.format(dataset_config.name))
 
