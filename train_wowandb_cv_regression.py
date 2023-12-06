@@ -151,6 +151,7 @@ def run(args: DictConfig) -> None:
     # ---------------------
     #        Models
     # ---------------------
+    args.duration = int((args.window.end - args.window.start) * args.preprocs.brain_resample_rate)
     brain_encoder = get_model(args).to(device) #BrainEncoder(args).to(device)
     # pretrained_weight = '../../results/20230429_sbj01_eegnet_cv_norm_regression/weights/model_last.pt'
     # brain_encoder.load_state_dict(torch.load(pretrained_weight))
@@ -225,6 +226,7 @@ def run(args: DictConfig) -> None:
             
             # import pdb; pdb.set_trace()
             Z = brain_encoder(X, None)
+            # import pdb; pdb.set_trace()
             loss = loss_func(Y, Z)
             with torch.no_grad():
                 trainTop1acc, trainTop10acc = classifier(Z, Y)
@@ -286,7 +288,7 @@ def run(args: DictConfig) -> None:
             test_losses.append(loss.item())
             testTop1accs.append(testTop1acc)
             testTop10accs.append(testTop10acc)
-
+        temp = loss_func.temp.item() if isinstance(loss_func, CLIPLoss) else 0.0
         print(
             f"Ep {epoch}/{args.epochs} | ",
             f"train l: {np.mean(train_losses):.3f} | ",
@@ -294,7 +296,7 @@ def run(args: DictConfig) -> None:
             f"trainTop10acc: {np.mean(trainTop10accs):.3f} | ",
             f"testTop10acc: {np.mean(testTop10accs):.3f} | ",
             f"lr: {optimizer.param_groups[0]['lr']:.5f}",
-            f"temp: {0.00:.3f}",
+            f"temp: {temp:.3f}",
         )
         pkl_logger.log({
                 "epoch": epoch,
@@ -305,7 +307,7 @@ def run(args: DictConfig) -> None:
                 "testTop1acc": np.mean(testTop1accs),
                 "testTop10acc": np.mean(testTop10accs),
                 "lrate": optimizer.param_groups[0]["lr"],
-                "temp": loss_func.temp.item if isinstance(loss_func, CLIPLoss) else 0,
+                "temp": loss_func.temp.item() if isinstance(loss_func, CLIPLoss) else 0,
             }, 'logs')
 
         if usewandb:
@@ -318,7 +320,7 @@ def run(args: DictConfig) -> None:
                 "testTop1acc": np.mean(testTop1accs),
                 "testTop10acc": np.mean(testTop10accs),
                 "lrate": optimizer.param_groups[0]["lr"],
-                "temp": loss_func.temp.item if isinstance(loss_func, CLIPLoss) else 0,
+                "temp": loss_func.temp.item() if isinstance(loss_func, CLIPLoss) else 0,
             }
             wandb.log(performance_now)
 
@@ -338,7 +340,7 @@ def run(args: DictConfig) -> None:
 if __name__ == "__main__":
     from hydra import initialize, compose
     with initialize(version_base=None, config_path="meg_ssl/task_configs/"):
-        args = compose(config_name='regression_eegnet_deep_mse_full')
+        args = compose(config_name='regression_eegnet_deep_clip_things5')
     if not os.path.exists(os.path.join(args.save_root, 'weights')):
         os.makedirs(os.path.join(args.save_root, 'weights'))
     run(args)

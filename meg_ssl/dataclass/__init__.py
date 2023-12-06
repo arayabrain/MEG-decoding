@@ -67,7 +67,7 @@ def collect_session_dataset(dataset_info_list:List[Dict], dataset_config_list:Li
         dataset = get_session_dataset(dataset_info, dataset_config, preproc_config, num_trial_limit, image_preprocs, meg_preprocs, only_meg, on_memory, ret_image_label)
         skip_flag = 0
         for black in BLACK_MAT_FILE_LIST:
-            if black in dataset.meg_path:
+            if hasattr(dataset, 'meg_path') and black in dataset.meg_path:
                 skip_flag = 1
                 break
         if skip_flag == 1:
@@ -93,7 +93,7 @@ def get_session_dataset(dataset_info:dict, dataset_config:OmegaConf, preproc_con
                                  dataset_info['image_id_path'], sbj_name=dataset_info['sbj_name'], image_preprocs=image_preprocs, meg_preprocs=meg_preprocs,
                                  num_trial_limit=num_trial_limit, only_meg=only_meg, on_memory=on_memory, ret_image_label=ret_image_label)
     elif dataset_config.name == 'things':
-        return SessionDatasetGOD(dataset_config, preproc_config, dataset_info['session_id'], dataset_info['image_root'],
+        return SessionDatasetThings(dataset_config, preproc_config, dataset_info['session_id'], dataset_info['image_root'],
                                  dataset_info['meg_root'], dataset_info['h5_file_name'], dataset_info['sbj_name'],
                                  image_preprocs=image_preprocs, meg_preprocs=meg_preprocs,
                                  num_trial_limit=num_trial_limit, only_meg=only_meg, on_memory=on_memory, ret_image_label=ret_image_label, split=dataset_info['split'])

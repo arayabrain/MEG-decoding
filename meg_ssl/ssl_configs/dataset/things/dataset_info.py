@@ -41,7 +41,7 @@ def get_dataset_info(name:str, h5_dir:str)->list:
     return dataset_info_list
 
 def dataset_path(sbj, split, id, h5_dir)->dict:
-    sbj = 'sbj{}'.format(str(sbj).zfill(2))
+    # sbj = 'sbj{}'.format(str(sbj).zfill(2))
     if split == 'train':
         session_name = 'data_block{}'.format(str(id).zfill(3))
         split_name = 'exp'
@@ -55,7 +55,7 @@ def dataset_path(sbj, split, id, h5_dir)->dict:
         'session_id': id,
         'image_root': image_root,
         'meg_root': meg_root,
-        'h5_file_name': os.path.join(h5_dir, '{}_{}.h5'.format(sbj, session_name)),
+        'h5_file_name': os.path.join(h5_dir, '{}_{}_{}.h5'.format(sbj, session_name, split_name)),
         'sbj_name': sbj,
         'split':split_name
     }

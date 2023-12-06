@@ -23,7 +23,7 @@ def get_model(args):
     elif args.model == 'eegnet':
         return EEGNet(args)
     elif args.model == 'eegnet_deep':
-        return EEGNet(args)
+        return EEGNetDeep(args)
     elif args.model == 'eegnet_sub':
         return EEGNetSub(args)
     elif args.model == 'eegnet_cogitat':
@@ -135,11 +135,11 @@ class EEGNet(nn.Module):
         self.conv1 = nn.Sequential(
             nn.Conv2d(1, args.F1, (1, args.k1), padding="same", bias=False), nn.BatchNorm2d(args.F1)
         )
-        roi_channels = roi(args)
+        # roi_channels = roi(args)
         if "src_reconstruction" in args.keys() and args.src_reconstruction:
             num_channels = args.src_ch #449 # hard coding
         else:
-            num_channels = len(roi_channels)
+            num_channels = args.num_channels  # len(roi_channels)
         self.conv2 = nn.Sequential(
             nn.Conv2d(
                 args.F1, args.D * args.F1, (num_channels, 1), groups=args.F1, bias=False
@@ -620,11 +620,11 @@ class BrainEncoderSeq2Static(nn.Module):
 
 
 class EEGNetDeep(nn.Module):
-    def __init__(self, args, duration):
+    def __init__(self, args):
         # args: F1, k1, D, F2, k2, num_conv_emb_layers
         # args: use_dilation, num_channels_per_patch, num_channels, stride1, dr1, dr2, t_mel, n_mel, k_div
         super(EEGNetDeep, self).__init__()
-
+        duration = args.duration
         self.conv1 = nn.Sequential(
             nn.Conv2d(1, args.F1, (1, args.k1), padding="same", bias=False), nn.BatchNorm2d(args.F1)
         )
@@ -733,7 +733,12 @@ class EEGNetDeep(nn.Module):
             emb_layers_list += [nn.GELU(), nn.Conv1d(args.n_mel, args.n_mel, 1, bias=False)]
         self.conv_emb2 = nn.Sequential(*emb_layers_list)
 
-    def forward(self, x):
+        if args.t_mel > 1:
+            self.temporal_aggregation = OriginalAggregator(args, args.t_mel) # nn.Linear(args.t_mel, 1) # nn.Sequential(nn.Flaten(), nn.Linear(args.n_mel * args.t_mel, args.t_mel))
+        else:
+            self.temporal_aggregation = None
+
+    def forward(self, x, sbj_idx):
         x = x.unsqueeze(
             dim=1
         )  # if x shape is (B, C, T), then x shape is (B, 1, C, T) (B, 1, 128, 1440)
@@ -747,7 +752,11 @@ class EEGNetDeep(nn.Module):
         x = self.conv_time1(x)
         x = self.conv_time2(x)
         x = self.conv_emb1(x)
-        return self.conv_emb2(x).squeeze(-1)
+        x = self.conv_emb2(x)
+        # import pdb; pdb.set_trace()
+        if self.temporal_aggregation:
+            x = self.temporal_aggregation(x)
+        return x.squeeze(-1)
 
     def residual_spatial_dim(self, num_channels, duration):
         x = torch.zeros((1, 1, num_channels, duration))
@@ -784,3 +793,34 @@ class EEGNetDeep(nn.Module):
                 return (quotient - 1) * m
             else:
                 return quotient * m
+            
+
+class OriginalAggregator(nn.Module):
+    """Original temporal aggregation module"""
+
+    def __init__(self, args, temporal_dim: int, temporal_multiplier: int = 1) -> None:
+        super().__init__()
+
+        self.layers = nn.Sequential(
+            nn.Conv1d(
+                in_channels=args.n_mel,
+                out_channels=args.n_mel,
+                kernel_size=1,
+                stride=1,
+            ),
+            nn.Conv1d(
+                in_channels=args.n_mel,
+                out_channels=args.n_mel,
+                kernel_size=1,
+                stride=1,
+            ),
+            nn.Flatten(),
+            nn.Linear(
+                args.n_mel * temporal_dim,
+                args.n_mel * temporal_multiplier,
+                bias=True,
+            ),
+        )
+
+    def forward(self, X: torch.Tensor) -> torch.Tensor:
+        return self.layers(X)

@@ -1,0 +1,7 @@
+meg_onset: -0.5
+meg_duration: 1.5
+clamp: [-20, 20]
+bandpass_filter: [0.5, 120]
+brain_resample_rate: 120
+src_reconstruction: False
+baseline_duration: 0.1

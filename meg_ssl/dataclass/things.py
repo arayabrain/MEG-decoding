@@ -169,9 +169,9 @@ class SessionDatasetThings(Dataset):
         self.meg_onset_frames = int(self.meg_onset * self.meg_fs / self.decimation_rate) # [frame]
 
 
-        self.meg_dir                     = f'{meg_root}/sub-BIGMEG{sbj_name}/'
-        self.sourcedata_dir              = f'{meg_root}/sourcedata/'
-        self.preproc_dir                 = f'{meg_root}/derivatives/preprocessed/'
+        self.meg_dir                     = os.path.join(f'{meg_root}', f'sub-BIGMEG{sbj_name}')
+        self.sourcedata_dir              = os.path.join(f'{meg_root}', 'sourcedata')
+        self.preproc_dir                 = os.path.join(f'{meg_root}', 'derivatives/preprocessed')
 
         self.prepare_data()
 
@@ -180,6 +180,8 @@ class SessionDatasetThings(Dataset):
         return len(self.indices)
 
     def __getitem__(self, idx:int)->Tuple:
+        # 前処理
+        # z-score per channel -> baseline correction -> clamp  
         idx = self.indices[idx]
         # [n_epochs, n_channels, n_times]
         if self.on_memory:
@@ -188,7 +190,7 @@ class SessionDatasetThings(Dataset):
             with h5py.File(self.h5_file_name, "r") as h5:
                 ROI_MEG_Data = h5['ROI_MEG_Data'][idx, :, :]
          # z-score -> baseline correction -> clamp
-        ROI_MEG_Data = z_score_epoch(ROI_MEG_Data) # z-score by channel across time
+        ROI_MEG_Data = z_score_epoch(ROI_MEG_Data) # z-score by channel across time  # HERE
         ROI_MEG_Data -= np.mean(ROI_MEG_Data[:, :self.baseline_duration_frames], axis=1)[:, np.newaxis] # baseline correction
         # ROI_MEG_Data = ROI_MEG_Data[:, -self.meg_duration_frames:]# ROI_MEG_Data[:, self.meg_onset_frames:] # remove before onset
         if self.clamp is not None:
@@ -202,6 +204,7 @@ class SessionDatasetThings(Dataset):
         else:
             image_path = os.path.join(self.image_root, self.image_names[idx])
             image = cv2.imread(image_path)
+            assert os.path.exists(image_path), f'{image_path} is missing'
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             cat_id = self.cat_ids[idx]
             for func_ in self.image_preprocs:
@@ -217,12 +220,14 @@ class SessionDatasetThings(Dataset):
     def prepare_data(self):
 
         # 前処理内容
-        # CAR -> (src_reconst) -> bandpass filter -> resample
+        # bandpass filter -> resample
         ## Kingの前処理は downsamlple(120Hz) -> clip -> epoching -> baseline correction (-mean signal)
 
         full_metadata = pd.read_csv(f'{self.sourcedata_dir}/sample_attributes_P{str(self.sbj_name)}.csv')
-        assert len(epochs) == self.num_epochs_per_session
+        
         metadata = full_metadata.query(f'session_nr=={self.session_id}')# metadata.iloc[start_id:end_id]
+        metadata = metadata.reset_index(drop=True)
+
         image_names = []
         cat_names = []
         cat_ids = []
@@ -232,14 +237,14 @@ class SessionDatasetThings(Dataset):
             # images_test_meg/tuxedo_16s.jpg
 
             base_name =  image_name.split('/')[-1]
-            cat_name =base_name.split('_')[0]
+            cat_name ='_'.join(base_name.split('_')[:-1])
             image_name = os.path.join(cat_name, base_name)
             image_names.append(image_name)
             cat_names.append(cat_name)
 
         for cat_id in metadata.query(f'trial_type=="{self.split}"')['things_category_nr'].to_list():
             cat_ids.append(cat_id)
-
+        # print('target h5 file', self.h5_file_name, os.path.exists(self.h5_file_name) and not self.force_create_h5)
         if os.path.exists(self.h5_file_name) and not self.force_create_h5:
             print('load h5 file {}'.format(self.h5_file_name))
             with h5py.File(self.h5_file_name, "r") as h5:
@@ -252,24 +257,24 @@ class SessionDatasetThings(Dataset):
             for run, curr_path in enumerate(run_paths):
                 raw = read_raw(curr_path, self.session_id,run, self.sbj_name)
                 events = read_events(event_paths,run,raw, self.trigger_channel, self.trigger_amplitude)
-                raw.filter(l_freq=self.preproc_config.bandpass_filter[0],h_freq=self.preproc_config.bandpass_filter[1])
+                raw.filter(l_freq=self.preproc_config.bandpass_filter[0],h_freq=self.preproc_config.bandpass_filter[1]) # HERE
                 epochs = concat_epochs(raw, events, epochs, self.preproc_config.meg_onset, self.preproc_config.meg_onset+self.preproc_config.meg_duration)
                 epochs.drop_bad()
             # print(epochs.info)
-            # epochs = baseline_correction(epochs)
+            epochs = baseline_correction(epochs) # HERE
             assert len(metadata) == self.num_epochs_per_session
             epochs.metadata = metadata
             epochs.decimate(decim=(self.original_fs/self.preproc_config.brain_resample_rate))
 
-
+            assert len(epochs) == self.num_epochs_per_session
             ignore_indices =[]
             for split_name in ['exp', 'test', 'catch']:
                 if split_name == self.split:
                     target_indices = metadata.query(f'trial_type=="{split_name}"').index.to_numpy()
                 else:
                     ignore_indices += metadata.query(f'trial_type=="{split_name}"').index.to_list()
-
-            epochs = epochs.drop(ignore_indices)
+            # import pdb; pdb.set_trace()
+            epochs.drop(ignore_indices)
             self.num_electrodes = epochs.info['nchan']
 
 
@@ -287,6 +292,10 @@ class SessionDatasetThings(Dataset):
             ROI_MEG_Data = ROI_MEG_Data.astype(np.float32)
 
         if self.on_memory:
+            if not os.path.exists(self.h5_file_name):
+                with h5py.File(self.h5_file_name, "w") as h5:
+                    h5.create_dataset("ROI_MEG_Data", data=ROI_MEG_Data)
+                    print('save ROI_MEG_Data to {}'.format(self.h5_file_name))
             self.ROI_MEG_Data = ROI_MEG_Data
         else:
             if os.path.exists(self.h5_file_name) and not self.force_create_h5:
